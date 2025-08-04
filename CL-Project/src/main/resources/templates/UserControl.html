@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin · User Control</title>
+	
+	<!--icon-->
+	<link rel="icon" href="/images/profile/favicon.png" type="image/x-icon">
+	
+    <link rel="stylesheet" href="/css/topbar.css" />
+    <link rel="stylesheet" href="/css/sidebar.css" />
+    <link rel="stylesheet" href="/css/loginModal.css" />
+    <link rel="stylesheet" href="/css/shareStyle.css" />
+    <!-- Shared scripts -->
+    <script src="/js/session.js"></script>
+    <script src="/js/auth-fetch.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <script src="/js/topbar.js"></script>
+    <script src="/js/loginModal.js"></script>
+    <script src="/js/userControl.js"></script>
+
+    <!-- page-specific -->
+    <link rel="stylesheet" href="/css/userControl.css" />
+
+    <!-- Client-side auth guard -->
+    <script>
+        if (!isLoggedIn()) {
+            window.location.href = '/';
+        }
+    </script>
+  
+  </head>
+  <body>
+     <!-- Sidebar toggle button (hamburger icon) -->
+  <div class="sidebar-toggle" onclick="toggleSidebar()">☰</div>
+
+  <!-- Topbar fragment: login/profile/logout UI -->
+  <div th:replace="~{fragments/topbar :: topbar}"></div>
+
+  <!-- Login Modal fragment: login form dialog -->
+  <div th:replace="~{fragments/loginModal :: loginModal}"></div>
+
+  <!-- Left Sidebar fragment: navigation menu -->
+  <div th:replace="~{fragments/sidebar :: sidebar}"></div> 
+
+  <!-- ▣ 메인 콘텐츠 ▣ -->
+  <div class="container">
+    <h1 style="margin-bottom: 24px; color: #fff; font-weight: 700">
+      User Authority
+    </h1>
+
+    <div class="uc-wrapper glass-box">
+      <!-- toolbar -->
+      <div class="uc-toolbar">
+        <div class="uc-search">
+          <input type="text" id="ucSearch" placeholder="Search users..." />
+        </div>
+        <div class="uc-filters" id="ucFilters">
+          <span class="uc-filter active" data-filter="all">All</span>
+          <span class="uc-filter" data-filter="granted">Granted</span>
+          <span class="uc-filter" data-filter="revoked">Revoked</span>
+        </div>
+      </div>
+
+      <!-- table -->
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 60px">ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th style="width: 140px">Authority</th>
+            <th style="width: 110px"></th>
+          </tr>
+        </thead>
+        <tbody id="ucTableBody">
+          <!-- populated by JS -->
+        </tbody>
+      </table>
+    </div>
+      <!-- /uc-wrapper -->
+    </div>
+    <!-- /container -->
+
+    <script>
+      // ===== demo data – replace with API =====
+      const users = [
+        { id: 1, name: "Alice Kim", email: "alice@example.com", auth: false },
+        { id: 2, name: "Bob Lee", email: "bob@example.com", auth: false },
+        { id: 3, name: "Chris Park", email: "chris@example.com", auth: false },
+        { id: 4, name: "Dana Choi", email: "dana@example.com", auth: false },
+        { id: 5, name: "Evan Ryu", email: "evan@example.com", auth: false },
+      ];
+
+      const body = document.getElementById("ucTableBody");
+      const searchInput = document.getElementById("ucSearch");
+      const filters = document.querySelectorAll(".uc-filter");
+
+      /* render */
+      function populate() {
+        const term = searchInput.value.toLowerCase();
+        const filter =
+          document.querySelector(".uc-filter.active").dataset.filter;
+
+        body.innerHTML = "";
+        users
+          .filter((u) => {
+            const match = `${u.name} ${u.email}`.toLowerCase().includes(term);
+            if (filter === "granted" && !u.auth) return false;
+            if (filter === "revoked" && u.auth) return false;
+            return match;
+          })
+          .forEach((u) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+        <td>${u.id}</td>
+        <td>${u.name}</td>
+        <td>${u.email}</td>
+        <td><span class="auth-chip ${u.auth ? "granted" : "revoked"}">${
+              u.auth ? "GRANTED" : "REVOKED"
+            }</span></td>
+        <td><button class="toggle-btn" data-id="${u.id}">${
+              u.auth ? "Revoke" : "Grant"
+            }</button></td>`;
+            body.appendChild(tr);
+          });
+      }
+
+      /* search */
+      searchInput.addEventListener("input", populate);
+
+      /* filter pills */
+      filters.forEach((f) =>
+        f.addEventListener("click", () => {
+          filters.forEach((x) => x.classList.remove("active"));
+          f.classList.add("active");
+          populate();
+        })
+      );
+
+      /* toggle authority */
+      body.addEventListener("click", (e) => {
+        if (!e.target.classList.contains("toggle-btn")) return;
+        const id = Number(e.target.dataset.id);
+        const u = users.find((x) => x.id === id);
+        if (!u) return;
+        u.auth = !u.auth;
+        populate();
+      });
+
+      populate();
+    </script>
+  </body>
+</html>

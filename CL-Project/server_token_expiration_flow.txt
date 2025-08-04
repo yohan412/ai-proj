@@ -1,0 +1,83 @@
+Server-Side Token Expiration and Cleanup Logic Flow
+=================================================
+
+This document provides a granular, end-to-end explanation of how the server handles JWT session expiration and file cleanup. It clarifies that the token refresh mechanism is **reactive** (triggered by user requests) and guarantees that inactive user sessions will expire and their data will be cleaned up.
+
+### Key Components Involved
+
+*   **`JwtAuthenticationFilter.java`**: A Spring Security filter that intercepts every incoming HTTP request to a secured endpoint.
+    *   **Method:** `doFilterInternal(request, response, filterChain)`
+*   **`JwtTokenProvider.java`**: A service class responsible for creating, validating, and refreshing JWTs.
+    *   **Methods:** `isTokenNearExpiry(jwt)`, `refreshToken(jwt)`
+*   **`RedisTemplate`**: The Spring Data component used to execute commands against the Redis server.
+    *   **Method:** `opsForValue().set(key, value, duration)`
+*   **`RedisKeyExpirationListener.java`**: A component that subscribes to Redis keyspace notifications and is triggered when a key's Time-To-Live (TTL) expires.
+    *   **Method:** `onMessage(message, pattern)`
+*   **`FileService.java`**: A service class responsible for deleting user-specific files from the server's disk.
+    *   **Method:** `deleteUserFiles(username)`
+
+---
+
+### Scenario 1: The Active User (Session is Extended)
+
+This flow occurs only when a user sends an HTTP request to the server.
+
+1.  **Trigger: HTTP Request Received**
+    *   An active user sends a request to any secured endpoint (e.g., `POST /api/videos/upload`).
+
+2.  **Step 1: Interception (`JwtAuthenticationFilter.java`)**
+    *   The request is intercepted by the `doFilterInternal` method in the `JwtAuthenticationFilter` class.
+
+3.  **Step 2: Expiration Check (`JwtTokenProvider.java`)**
+    *   Inside `doFilterInternal`, after validating the token, this line is executed: `if (tokenProvider.isTokenNearExpiry(jwt))`.
+    *   This calls the `isTokenNearExpiry(String token)` method in the `JwtTokenProvider` service. This method checks if the token's expiration timestamp is less than 30 minutes away.
+
+4.  **Step 3: Refresh Logic (`JwtTokenProvider.java`)**
+    *   If `isTokenNearExpiry` returns `true`, the `doFilterInternal` method then calls `String newToken = tokenProvider.refreshToken(jwt);`.
+    *   This executes the `refreshToken(String token)` method in the `JwtTokenProvider` service.
+
+5.  **Step 4: Redis Update (`RedisTemplate`)**
+    *   Inside the `refreshToken` method, the following critical line is executed:
+        ```java
+        redisTemplate.opsForValue().set("jwt:" + username, newToken, Duration.ofMillis(jwtExpirationInMs));
+        ```
+    *   This command connects to the Redis server and performs an "upsert" operation on the key (e.g., `jwt:admin`). It overwrites the old token value with the `newToken` and, most importantly, **resets the Time-To-Live (TTL) for that key to a new, full 1-hour duration.**
+
+6.  **Outcome**
+    *   The user's session lifetime on the server is successfully extended for another hour. The new token is sent back to the client in the response header, and the client-side timer is also reset. This process can only be initiated by a user's request.
+
+---
+
+### Scenario 2: The Inactive User (Session Expires and Files are Cleaned Up)
+
+This flow occurs when a user does not send any requests to the server for a prolonged period.
+
+1.  **Trigger: User Inactivity**
+    *   The user is inactive for a period longer than the token's lifetime (e.g., > 1 hour). No HTTP requests are sent from their browser to the server.
+
+2.  **Step 1: No Server Activity**
+    *   Because no requests are being sent, the `JwtAuthenticationFilter` is never triggered for this user.
+    *   Consequently, the `refreshToken` method in `JwtTokenProvider` is never called for this user.
+
+3.  **Step 2: Redis TTL Countdown**
+    *   The TTL on the `jwt:username` key in Redis, which was set during the user's last interaction, continues to count down without being reset.
+
+4.  **Step 3: Key Deletion by Redis**
+    *   When the TTL reaches zero, the Redis server automatically deletes the `jwt:username` key. This is a built-in, guaranteed feature of Redis.
+
+5.  **Step 4: Expiration Event Notification**
+    *   The Redis server publishes a "keyspace notification" event for the expired key.
+
+6.  **Step 5: Listener Trigger (`RedisKeyExpirationListener.java`)**
+    *   The `onMessage(Message message, byte[] pattern)` method in the `RedisKeyExpirationListener` class, which is subscribed to these events, is triggered by the Redis server. The `message` contains the name of the expired key (e.g., `jwt:admin`).
+
+7.  **Step 6: File Cleanup (`FileService.java`)**
+    *   Inside the `onMessage` method, the code checks if the expired key starts with the `"jwt:"` prefix.
+    *   If it matches, the code extracts the `username` from the key.
+    *   It then calls the `deleteUserFiles(username)` method in the `FileService`.
+
+8.  **Step 7: Deletion from Disk (`FileService.java`)**
+    *   The `deleteUserFiles` method scans the `uploads/` directory and its subdirectories for any files prefixed with the `username` (e.g., `admin_historyvideo.mp4`) and permanently deletes them from the server's disk.
+
+9.  **Outcome**
+    *   The inactive user's session is terminated on the server, and all their associated video and analysis files are automatically and securely cleaned up, preventing orphaned files and resource leaks.

@@ -1,0 +1,126 @@
+
+body {
+  background: linear-gradient(to bottom right, #a6dba0, #379683);
+  line-height: 1.6;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  box-sizing: border-box;
+  padding-top: 50px
+}
+
+/* 전체 레이아웃 */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  margin-left: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 반투명 + 블러 박스 */
+.glass-box {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 18px;
+  padding: 32px;
+/*   반응형 대응 */
+  width: 95%;
+  max-width: 1300px;
+  margin: 32px auto 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.postDetail {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  position: relative;
+  max-width: 1300px;
+  width: 95%;
+  margin: 0 auto;
+  padding: 10px 10px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  font-size: 0.9rem;
+}
+.postNumber,
+.postTitle,
+.postWriter,
+.postDate,
+.postViews {
+  text-align: left;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: white;
+}
+
+.postContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.content-label {
+  font-size: 0.9rem;
+  color: #fff;
+}
+.content-box {
+  white-space: pre-wrap;
+  line-height: 1.4;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2); /* 테두리 */
+  background-color: rgba(255, 255, 255, 0.04); /* 배경 */
+  border-radius: 10px;
+  color: #fff; /* 글자색 */
+  font-size: 0.9rem;
+  min-height: 100px; /* 기본 높이 확보 */
+}
+
+.board_wrap {
+  width: 90%;
+  max-width: 1400px;
+  margin: 40px auto;
+}
+
+.board_title {
+  margin-bottom: 10px;
+  text-align: left;
+  padding: 10px 10px;
+  width: 95%;
+  margin: 0 auto;
+}
+.board_title strong {
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.bt_wrap {
+  margin-top: 20px;
+  text-align: right;
+}
+.bt_wrap button {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+@media (max-width: 740px) {
+  .postDetail {
+    width: 95%;
+    padding: 16px;
+  }
+
+  .bt_wrap button {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+  }
+}

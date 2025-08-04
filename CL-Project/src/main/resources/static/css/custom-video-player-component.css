@@ -1,0 +1,133 @@
+/*
+  custom-video-player-component.css
+
+  This stylesheet provides the styling for the reusable custom video player component.
+  It defines the appearance and layout of the player container, video element,
+  and all associated controls, including the play/pause button, timeline,
+  volume slider, and fullscreen button.
+
+  The styles are designed to be self-contained and are scoped using class names
+  to avoid conflicts with other elements on the page. This allows the component
+  to be dropped into any page and maintain a consistent look and feel.
+*/
+
+.custom-video-player-container {
+  width: 100%;
+  position: relative;
+}
+
+.custom-video-player {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.video-player-element {
+  width: 100%;
+  display: block;
+}
+
+.video-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1; /* Initially visible */
+  transition: opacity 0.3s ease-in-out; /* Smooth transition */
+}
+
+/* Class to hide controls */
+.video-controls.controls-hidden {
+  opacity: 0;
+  pointer-events: none; /* Prevent clicks when hidden */
+}
+
+.control-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.control-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
+.time-display {
+  color: white;
+  font-size: 14px;
+  margin: 0 12px;
+  font-family: monospace;
+}
+
+.timeline {
+  flex-grow: 1;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.progress {
+  height: 100%;
+  width: 0;
+  background-color: #4a90e2;
+  border-radius: 4px;
+}
+
+.volume-container {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+}
+
+.volume-slider {
+  width: 80px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #ddd;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  border-radius: 3px;
+}
+
+.volume-slider:hover {
+  opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #4a90e2;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #4a90e2;
+  cursor: pointer;
+  border-radius: 50%;
+  border: none;
+}

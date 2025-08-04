@@ -1,0 +1,84 @@
+/* Modal overlay (background) */
+#loginModal.modal {
+    display: none;
+    position: fixed;
+    z-index: 300;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Modal content box */
+#loginModal .modal-content {
+    position: relative;
+    background: #fff;
+    margin: 15% auto;
+    padding: 20px;
+    width: 300px;
+    border-radius: 10px;
+    text-align: center;
+    color: #000;
+}
+
+/* Input fields inside modal */
+#loginModal .modal-content input,
+#loginModal .modal-content textarea {
+    width: 90%;
+    margin: 10px 0;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Textarea resizable vertically */
+#loginModal .modal-content textarea {
+    resize: vertical;
+}
+
+/* Modal close (X) button */
+#loginModal .close {
+    position: absolute;
+    top: -3px;
+    right: 4px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+}
+
+/* Modal action buttons container */
+#loginModal .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+/* Modal action buttons */
+#loginModal .modal-actions button {
+    flex: 1 1 0;
+}
+
+/* Alternative style button (e.g., cancel) */
+#loginModal .modal-actions .alt {
+    background: transparent;
+    color: #379683;
+    border: 2px solid #379683;
+    font-weight: 600;
+}
+
+/* Alternative button hover effect */
+#loginModal .modal-actions .alt:hover {
+    background: #2e7c6b;
+    color: #fff;
+}
+
+#loginModal .modal-content button {
+    background-color: #379683;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}

@@ -1,0 +1,136 @@
+html {
+  height: 100%;
+}
+
+/* push content below fixed top‑bar (same height as UI.html) */
+      body {
+        height: 100%;
+        box-sizing: border-box;
+        padding-top: 68px;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+      }
+
+      /* center the admin card & give it more breathing‑room */
+      .uc-wrapper {
+        max-width: 1300px;
+        width: 96%;
+        margin: 32px auto 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* ── TOP TOOLBAR ───────────────────────────────────────── */
+      .uc-toolbar {
+        display: flex;
+        flex-wrap: wrap; /* wrap on small screens */
+        gap: 24px; /* bigger gap so borders never touch */
+        align-items: center;
+      }
+
+      /* search section expands but will shrink before overlapping pills */
+      .uc-search {
+        flex: 1 1 420px; /* grow, initial width 420 */
+        min-width: 260px;
+        position: relative;
+      }
+      .uc-search input {
+        width: 80%;
+        padding: 10px 44px 10px 16px;
+        border-radius: 8px;
+        border: 1.5px solid rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font-size: 0.9rem;
+      }
+      .uc-search svg {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        fill: #fff;
+        width: 18px;
+        pointer-events: none;
+        opacity: 0.6;
+      }
+
+      /* pill filters */
+      .uc-filters {
+        display: flex;
+        gap: 14px;
+        flex: 0 0 auto;
+      }
+      .uc-filter {
+        padding: 8px 20px;
+        border-radius: 999px;
+        border: 1.5px solid rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: 0.25s;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .uc-filter.active,
+      .uc-filter:hover {
+        background: #379683;
+        border-color: #46ac8f;
+      }
+
+      /* ── TABLE STYLES ─────────────────────────────────────── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      th,
+      td {
+        padding: 14px 12px;
+        white-space: nowrap;
+      }
+      thead th {
+        background: rgba(255, 255, 255, 0.1);
+        color: #cfd8dc;
+        font-weight: 600;
+      }
+      tbody tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      td {
+        color: #fff;
+      }
+
+      /* authority chip */
+      .auth-chip {
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.3px;
+      }
+      .granted {
+        background: #46ac8f;
+        color: #fff;
+      }
+      .revoked {
+        background: #ff6d6d;
+        color: #fff;
+      }
+
+      /* toggle button */
+      .toggle-btn {
+        cursor: pointer;
+        padding: 7px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #fff;
+        background: #379683;
+        transition: opacity 0.2s;
+      }
+      .toggle-btn:hover {
+        opacity: 0.82;
+      }

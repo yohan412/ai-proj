@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin · annRegistration</title>
+  
+  <!--icon-->
+  <link rel="icon" href="/images/profile/favicon.png" type="image/x-icon">
+  
+  <link rel="stylesheet" href="/css/topbar.css" />
+  <link rel="stylesheet" href="/css/sidebar.css" />
+  <link rel="stylesheet" href="/css/loginModal.css" />
+  <link rel="stylesheet" href="/css/shareStyle.css" />
+  <!-- Shared scripts -->
+  <script src="/js/session.js"></script>
+  <script src="/js/auth-fetch.js"></script>
+  <script src="/js/topbar.js"></script>    
+  <script src="/js/sidebar.js"></script>
+  <script src="/js/loginModal.js"></script>
+
+  <!-- page-specific styles -->
+  <link rel="stylesheet" href="/css/AnnRegistration.css" />
+</head>
+
+<body>
+     <!-- Sidebar toggle button (hamburger icon) -->
+  <div class="sidebar-toggle" onclick="toggleSidebar()">☰</div>
+
+  <!-- Topbar fragment: login/profile/logout UI -->
+  <div th:replace="~{fragments/topbar :: topbar}"></div>
+
+  <!-- Login Modal fragment: login form dialog -->
+  <div th:replace="~{fragments/loginModal :: loginModal}"></div>
+
+  <!-- Left Sidebar fragment: navigation menu -->
+  <div th:replace="~{fragments/sidebar :: sidebar}"></div> 
+  
+  <div class="container">
+    <div class="glass-box">              
+      <div class="board_wrap">
+        <div class="board_title">
+          <strong>Registration</strong>
+        </div>
+
+        <form class="board_write_form" id="postForm">
+          <div class="board_write">
+            <div class="title">
+              <dl>
+                <dt>Title</dt>
+                <dd><input type="text" name="title" required /></dd>
+              </dl>
+            </div>
+            <div class="info">
+              <dl>
+                <dt>ID</dt>
+                <dd><input type="text" name="writer" required /></dd>
+              </dl>
+              <dl>
+                <dt>Password</dt>
+                <dd><input type="password" name="password" required /></dd>
+              </dl>
+            </div>
+            <div class="cont">
+              <textarea name="content" placeholder="Type a content here " required></textarea>
+            </div>
+            <div class="bt_wrap">
+              <button type="submit" class="on">Registration</button>
+              <button type="button" id="cancelBtn">Cancel</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/AnnRegistration.js"></script>
+</body>
+</html>

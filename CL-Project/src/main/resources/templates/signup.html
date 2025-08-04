@@ -1,0 +1,133 @@
+<!-- signup.html  ─────────────────────────────────────────────
+     배경(gradient #a6dba0 → #379683) - 전역과 100% 동일
+──────────────────────────────────────────────────────────────-->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+ 
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Up · Cognitive Load Viewer</title>
+  
+  <!--icon-->
+  <link rel="icon" href="/images/profile/favicon.png" type="image/x-icon">
+
+  <!-- global theme (sets BODY gradient) -->
+  <link rel="stylesheet" href="/css/shareStyle.css" />
+
+  <!-- page-specific tweaks -->
+  <style>
+    /* 전역 gradient/폰트 그대로 두고, 가운데 정렬만 */
+    body{
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; margin:0;
+      /* ⬆ background 은 전역 styles.css 에 이미 선언됨
+         (linear-gradient → bottom-right, #a6dba0 → #379683) */
+    }
+
+    /* 카드: 로그인 모달과 통일된 흰색 surface */
+    .signup-card{
+      width:350px; padding:32px 36px;
+      background:#ffffff;
+      border:1px solid #dfe7ef;
+      border-radius:14px;
+      box-shadow:0 15px 45px rgba(0,0,0,0.08);
+      text-align:center; box-sizing:border-box;
+      color:#222;
+    }
+    .signup-card h2{ margin:0 0 20px; font-weight:600; }
+
+    .signup-card input{
+      width:100%; padding:10px 12px; margin-bottom:16px;
+      border-radius:6px; border:1px solid #c0c9d2;
+      background:#f7f9fb; color:#222; box-sizing:border-box;
+    }
+    .signup-card input:focus{ border-color:#379683; outline:none; }
+
+    .signup-card button{
+      width:100%; padding:12px 0;
+      background:#379683;          /* primary accent */
+      color:#fff; font-weight:700; border:none;
+      border-radius:6px; cursor:pointer;
+    }
+    .signup-card button:hover{ background:#2e7c6b; }
+    .signup-card button:disabled{ opacity:.6; cursor:not-allowed; }
+
+    .signup-card .alt-link{
+      display:block; margin-top:20px;
+      color:#40c4ff; text-decoration:none; font-weight:600;
+    }
+    .signup-card .alt-link:hover{ text-decoration:underline; }
+  </style>
+  
+</head>
+<body>
+
+  <!-- ▣ Sign-Up Card ▣ -->
+  <div class="signup-card">
+    <h2>Create Account</h2>
+    <div id="errorMessage" style="color: red; margin-bottom: 15px;"></div>
+    <form id="signUpForm">
+      <input type="text"     id="newUsername"     placeholder="Username"          required />
+      <input type="email"    id="newEmail"        placeholder="Email"             required />
+      <input type="password" id="newPassword"     placeholder="Password (min 6)" required minlength="6" />
+      <input type="password" id="confirmPassword" placeholder="Confirm Password"  required minlength="6" />
+
+      <button type="submit" id="registerBtn" disabled>Sign Up</button>
+    </form>
+
+    <a href="/" class="alt-link">← Back to Login</a>
+  </div>
+
+  <!-- Production-ready script -->
+  <script>
+    const pw = document.getElementById('newPassword');
+    const pwConfirm = document.getElementById('confirmPassword');
+    const inputs = document.querySelectorAll('#signUpForm input');
+    const registerBtn = document.getElementById('registerBtn');
+    const errorMessageDiv = document.getElementById('errorMessage');
+
+    inputs.forEach(i => i.addEventListener('input', validate));
+
+    function validate() {
+      const filled = [...inputs].every(i => i.value.trim() !== '');
+      const match = pw.value === pwConfirm.value;
+      registerBtn.disabled = !(filled && match);
+    }
+
+    document.getElementById('signUpForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        errorMessageDiv.textContent = ''; // Clear previous errors
+        registerBtn.disabled = true;
+
+        const username = document.getElementById('newUsername').value;
+        const email = document.getElementById('newEmail').value;
+        const password = document.getElementById('newPassword').value;
+
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, email, password }),
+            });
+
+            if (response.ok) {
+                alert('Registration successful! Please log in.');
+                window.location.href = '/';
+            } else {
+                const errorText = await response.text();
+                errorMessageDiv.textContent = errorText;
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            errorMessageDiv.textContent = 'An unexpected error occurred. Please try again.';
+        } finally {
+            registerBtn.disabled = false;
+        }
+    });
+  </script>
+
+</body>
+</html>

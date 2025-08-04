@@ -1,0 +1,58 @@
+Authentication Lifecycle Logic Flow
+=================================
+
+This document outlines the end-to-end process for user login, session management (including refresh and expiration), and logout.
+
+### Phase 1: Login
+
+1.  **Initiation (Browser):** A user clicks the "Login" button, which triggers JavaScript in `topbar.js` to display the login modal.
+2.  **User Input (Browser):** The user enters their credentials.
+3.  **Form Submission (`loginModal.js`):** The user clicks "Submit". The script captures the credentials and prepares a `fetch` request.
+4.  **API Request (`loginModal.js`):** A `POST` request is sent to `/api/auth/login` with the username and password in the JSON body.
+5.  **Fetch Interception (`auth-fetch.js`):** The `fetch` wrapper sees there is no current token and lets the request proceed unmodified.
+
+### Phase 2: Authentication (Java Backend)
+
+1.  **Controller Entry Point (`AuthController.java`):** The `/api/auth/login` endpoint is hit.
+2.  **Authentication Manager (Spring Security):** The controller passes the credentials to the `AuthenticationManager`.
+3.  **User Lookup (`CustomUserDetailsService.java`):** The manager uses this service to find the user in the database via `UserRepository`.
+4.  **Password Verification (Spring Security):** The `PasswordEncoder` securely compares the submitted password with the stored hash.
+5.  **Token Generation (`JwtTokenProvider.java`):** On success, `generateToken()` is called.
+    *   A new JWT is created with the user's details and a 1-hour expiration (`app.jwtExpirationInMs`).
+    *   The token is signed with the secret key (`app.jwtSecret`).
+    *   The token is stored in Redis with a key like `jwt:username` and a 1-hour Time-To-Live (TTL).
+6.  **HTTP Response:** The controller sends a `200 OK` response containing the JWT (`{ "accessToken": "..." }`).
+
+### Phase 3: Session Start (Browser)
+
+1.  **Response Handling (`loginModal.js`):** The browser receives the token.
+2.  **Token Storage (`session.js`):** The `saveToken()` function is called, storing the JWT in the browser's `localStorage`.
+3.  **Page Reload:** The script calls `window.location.reload()`.
+4.  **Initial Logout Scheduling (`auth-fetch.js`):** As the page reloads, `auth-fetch.js` runs. It finds the token in `localStorage`, decodes its expiration time, and uses `setTimeout` to schedule the `clientSideLogout()` function to run when the token expires.
+
+### Phase 4: Token Refresh (Sliding Session)
+
+1.  **User Activity (Browser):** The user performs an action (e.g., uploads a file) that triggers an API call.
+2.  **Fetch Interception (`auth-fetch.js`):** The `fetch` wrapper automatically adds the `Authorization: Bearer <token>` header to the outgoing request.
+3.  **Server-Side Validation (`JwtAuthenticationFilter.java`):** The filter intercepts the request on the backend.
+    *   It validates the token.
+    *   It calls `isTokenNearExpiry()`. If the token has < 30 minutes remaining, this returns `true`.
+4.  **Token Generation (`JwtTokenProvider.java`):** The filter calls `refreshToken()`. A new JWT with a new 1-hour expiration is created and saved to Redis, overwriting the old one.
+5.  **Response Header Injection (`JwtAuthenticationFilter.java`):** The filter adds the new token to the HTTP response in the `Authorization` header.
+6.  **Client-Side Refresh (`auth-fetch.js`):** The `fetch` wrapper on the client inspects the response.
+    *   It finds the new token in the header.
+    *   It calls `saveToken()` to update `localStorage`.
+    *   It calls `scheduleLogout()` again, which cancels the old timer and sets a new one based on the new token's expiration.
+
+### Phase 5: Logout and Expiration
+
+**Scenario A: Manual Logout**
+1.  **User Action (Browser):** The user clicks the "Logout" button.
+2.  **Event Handling (`topbar.js`):** The `logout()` function from `session.js` is called.
+3.  **Client-Side Cleanup (`session.js` & `auth-fetch.js`):** `localStorage` is cleared, and the page is redirected to `/`.
+
+**Scenario B: Token Expiration (Inactivity)**
+1.  **Inactivity:** The user is idle for more than an hour.
+2.  **Client-Side Timer (`auth-fetch.js`):** The `setTimeout` from the last refresh fires, executing `clientSideLogout()`. This clears `localStorage` and redirects the user to `/`.
+3.  **Server-Side Expiration (Redis):** The 1-hour TTL on the `jwt:username` key in Redis expires, and the key is automatically deleted.
+4.  **Redis Listener (`RedisKeyExpirationListener.java`):** The key deletion event is caught. The listener extracts the username and calls `fileService.deleteUserFiles()` to clean up all of that user's files from the `uploads/` directory.

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+  <div th:fragment="videoPlayer(playerId)" class="custom-video-player-container">
+    <div th:id="${playerId}" class="custom-video-player">
+      <video class="video-player-element"></video>
+
+      <!-- Controls -->
+      <div class="video-controls">
+        <button class="control-btn play-pause-btn">
+          <svg class="play-icon" viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M8,5.14V19.14L19,12.14L8,5.14Z" /></svg>
+          <svg class="pause-icon" style="display:none;" viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M14,19H18V5H14M6,19H10V5H6V19Z" /></svg>
+        </button>
+
+        <span class="time-display">0:00 / 0:00</span>
+
+        <div class="timeline">
+          <div class="progress"></div>
+        </div>
+
+        <div class="volume-container">
+          <button class="control-btn volume-btn">
+            <svg class="volume-high-icon" viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>
+            <svg class="volume-mute-icon" style="display:none;" viewBox="0 0 24 24"><path d="M12,4L7,9H3V15H7L12,20V4M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,13.34 18.5,14.58 17.75,15.6L19.82,17.67C20.94,16.25 21.5,14.21 21.5,12C21.5,7.72 18.5,4.14 14.5,3.23M16.5,12C16.5,12.11 16.5,12.21 16.5,12.31L14.5,10.31V7.97C15.5,8.71 16.5,10.23 16.5,12M1.27,4.27L3,6.04L7.5,10.54V15H3.5V9H7.5L12.5,4V8.54L14.22,10.26L14.5,10.5V11.5L16.5,13.5V12C16.5,13.76 15.5,15.29 14.5,16V18.7L19.73,24L21,22.73L2.54,4.27Z" /></svg>
+          </button>
+          <input type="range" min="0" max="1" step="0.05" value="1" class="volume-slider">
+        </div>
+
+        <button class="control-btn fullscreen-btn">
+          <svg viewBox="0 0 24 24"><path d="M5,5H10V7H7V10H5V5M14,5H19V10H17V7H14V5M17,14H19V19H14V17H17V14M10,17H5V14H7V17H10V19Z" /></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
