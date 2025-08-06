@@ -1,0 +1,42 @@
+<div th:fragment="header">
+	<header id="header" class="alt">
+		<h1><a href="index.html">AIkademia</a></h1>
+		<nav id="nav">
+			<ul>
+				<li class="special">
+					<a href="#menu" class="menuToggle"><span>Menu</span></a>
+					<div id="menu">
+						<ul>
+							<li><a th:href="@{/}">Home</a></li>
+							<li><a th:href="@{/manage}">generic</a></li>
+				            <li><a th:href="@{/}">Deep&nbsp;Analyze</a></li>
+							<li><a href="#">Sign Up</a></li>
+							<li><a href="#" class="login-link" onclick="togglePopup()">Log In</a></li>
+						</ul>
+					</div>
+				</li>
+			</ul>
+		</nav>
+	</header>
+	
+	<div class="login-popup-wrapper">
+
+	    <div id="login-popup" class="popup hidden">
+	        <div class="popup-content glass">
+	            <h2>Login</h2>
+	            <form>
+	                <input type="text" placeholder="아이디" required><br>
+	                <input type="password" placeholder="비밀번호" required><br>
+	                <button type="submit">로그인</button>
+	            </form>
+	            <button type="button" onclick="togglePopup()">닫기</button>
+	        </div>
+	    </div>
+	</div>
+
+	<script>
+	    function togglePopup() {
+	        document.getElementById("login-popup").classList.toggle("hidden");
+	    }
+	</script>
+</div>

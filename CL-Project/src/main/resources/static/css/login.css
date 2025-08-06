@@ -1,0 +1,72 @@
+.login-popup-wrapper .popup.hidden {
+    display: none;
+}
+
+
+.login-popup-wrapper .popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4); /* 배경 어둡게 */
+    display: flex;
+    align-items: center;   /* 수직 중앙 정렬 */
+    justify-content: center; /* 수평 중앙 정렬 */
+    z-index: 1000;
+}
+
+.login-popup-wrapper .popup-content {
+    width: 450px; /* 넓이 고정 */
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+
+    /* 입체감 */
+    background: rgba(255, 255, 255, 0.1); /* 더 옅게 처리해서 입체효과 강조 */
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.25),  /* 외부 그림자 */
+        inset 0 0 10px rgba(255, 255, 255, 0.05); /* 내부 그림자 */
+    
+    color: white;
+    position: relative;
+    z-index: 1001;
+}
+
+/* 입력창도 강화 */
+.login-popup-wrapper input[type="text"],
+.login-popup-wrapper input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    margin: 12px 0;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: white;
+    font-size: 16px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* 버튼도 유사 입체감 */
+.login-popup-wrapper button {
+    margin-top: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.login-popup-wrapper button:hover {
+    background: rgba(255, 255, 255, 0.35);
+}

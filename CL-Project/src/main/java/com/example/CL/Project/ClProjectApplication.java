@@ -14,9 +14,9 @@ public class ClProjectApplication {
     public static void main(String[] args) {
         SpringApplication.run(ClProjectApplication.class, args);
     }
-    @Bean
-    public RestTemplate restTemplate() {
-    return new RestTemplate();
-      }
+//    @Bean
+//    public RestTemplate restTemplate() {
+//    return new RestTemplate();
+//      }
  }
 
