@@ -1,77 +1,141 @@
-<!DOCTYPE HTML>
-<!--
-	Spectral by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
-<html>
-	<head>
-		<title>Generic - Spectral by HTML5 UP</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="/css/main.css" />
-		<link rel="stylesheet" href="/css/login.css" />
-		<noscript><link rel="stylesheet" href="/css/noscript.css" /></noscript>
-	</head>
-	<body class="is-preload">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>영상 편집 툴</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/login.css" />
+  <noscript><link rel="stylesheet" href="/css/noscript.css" /></noscript>
+  <style>
+    body { margin: 0; background-color: #2e3842; font-family: 'Arial', sans-serif; color: #fff; }
+    .editor-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+    .editor-inner { width: 100%; max-width: 1200px; display: flex; flex-direction: column; height: 90vh; border: 1px solid #3c4550; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+    .preview-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background-color: #1f252c; cursor: pointer; }
+    .preview-area.dragover { outline: 2px dashed #1f90ff; }
+    .preview-area video, .preview-area img { max-height: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    #video-input { display:none; }
+    /* 타임라인 컨테이너 */
+    .timeline-container { position: relative; background-color: #242c35; padding: 40px 20px 20px; border-top: 1px solid #3c4550; overflow-x: auto; }
+    .timeline-container .segment-bar { position: absolute; top: 10px; left: 20px; right: 20px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; z-index: 2; cursor: pointer; }
+    .timeline-container .segment-bar .handle { position: absolute; top: -4px; width: 12px; height: 14px; background: rgba(255,255,255,0.8); border-radius: 3px; cursor: ew-resize; z-index: 3; }
+    .timeline-container .segment-bar .handle.start { left: 0; }
+    .timeline-container .time-label { position: absolute; top: 24px; left: 20px; font-size: 12px; color: rgba(255,255,255,0.8); z-index: 2; }
+    .timeline {
+      display: flex;
+      align-items: center;
+      margin-top: 25px;
+    }
+    .timeline-item { flex: 0 0 auto; width: 100px; height: 100px; background-color: #3d4754; margin-right: 10px; border-radius: 6px; transition: transform 0.2s; }
+    .timeline-item:hover { transform: scale(1.05); background-color: #505c6a; }
+  </style>
+</head>
+<body>
+  <div th:replace="~{fragments/header :: header}"></div>
+  <input type="file" id="video-input" accept="video/*">
+  <div class="editor-container">
+    <div class="editor-inner">
+      <div class="preview-area" id="preview-area">
+        <img src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW" alt="video preview" id="preview-media">
+      </div>
+      <div class="timeline-container" id="timeline-container">
+        <div class="segment-bar" id="segment-bar">
+          <div class="handle start" id="start-handle"></div>
+        </div>
+        <span class="time-label" id="time-label">0:00 - 0:00</span>
+        <div class="timeline" id="timeline">
+          <div class="timeline-item"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/js/jquery.min.js"></script>
+  <script>
+    const input = document.getElementById('video-input');
+    const previewArea = document.getElementById('preview-area');
+    const timelineContainer = document.getElementById('timeline-container');
+    const segmentBar = document.getElementById('segment-bar');
+    const handle = document.getElementById('start-handle');
+    const timeLabel = document.getElementById('time-label');
+    let videoEl, duration = 0;
 
-		<!-- Page Wrapper -->
-			<div id="page-wrapper">
+    previewArea.addEventListener('click', (e) => {
+        // 비디오 요소 클릭 시 이벤트 무시
+        if (e.target.tagName.toLowerCase() === 'video') return;
+        input.click();
+      });
+    previewArea.addEventListener('dragover', e => { e.preventDefault(); previewArea.classList.add('dragover'); });
+    previewArea.addEventListener('dragleave', () => previewArea.classList.remove('dragover'));
+    previewArea.addEventListener('drop', e => { e.preventDefault(); previewArea.classList.remove('dragover'); const file = e.dataTransfer.files[0]; if (file && file.type.startsWith('video/')) loadVideo(file); });
+    input.addEventListener('change', e => { const file = e.target.files[0]; if (file && file.type.startsWith('video/')) loadVideo(file); });
 
-				<!-- Header -->
-				<!-- Left Sidebar fragment: navigation menu -->
-				<div th:replace="~{fragments/header :: header}"></div>
+    function loadVideo(file) {
+      const url = URL.createObjectURL(file);
+      previewArea.innerHTML = '';
+      videoEl = document.createElement('video');
+      videoEl.src = url; videoEl.controls = true;
+      videoEl.style.maxHeight = '100%'; videoEl.style.maxWidth = '100%'; videoEl.style.borderRadius = '8px';
+      previewArea.appendChild(videoEl);
+      duration = 0;
+      videoEl.addEventListener('loadedmetadata', () => {
+        duration = videoEl.duration;
+        initSegmentControls();
+      });
+    }
 
-				<!-- Main -->
-					<article id="main">
-						<header>
-							<h2>Generic Page</h2>
-							<p>Aliquam ut ex ut interdum donec amet imperdiet eleifend</p>
-						</header>
-						<section class="wrapper style5">
-							<div class="inner">
+    function initSegmentControls() {
+      // reset handle position
+      handle.style.left = '0px';
+      updateTimeLabel(0, duration);
+      bindSegmentEvents();
+    }
 
-								<h3>Lorem ipsum dolor</h3>
-								<p>Morbi mattis mi consectetur tortor elementum, varius pellentesque velit convallis. Aenean tincidunt lectus auctor mauris maximus, ac scelerisque ipsum tempor. Duis vulputate ex et ex tincidunt, quis lacinia velit aliquet. Duis non efficitur nisi, id malesuada justo. Maecenas sagittis felis ac sagittis semper. Curabitur purus leo, tempus sed finibus eget, fringilla quis risus. Maecenas et lorem quis sem varius sagittis et a est. Maecenas iaculis iaculis sem. Donec vel dolor at arcu tincidunt bibendum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Fusce ut aliquet justo. Donec id neque ipsum. Integer eget ultricies odio. Nam vel ex a orci fringilla tincidunt. Aliquam eleifend ligula non velit accumsan cursus. Etiam ut gravida sapien.</p>
+    function bindSegmentEvents() {
+      // click on bar
+      segmentBar.addEventListener('click', e => {
+        const rect = segmentBar.getBoundingClientRect();
+        const offset = e.clientX - rect.left;
+        const t = (offset / rect.width) * duration;
+        if (videoEl) videoEl.currentTime = t;
+        handle.style.left = offset + 'px';
+        updateTimeLabel(t, duration);
+      });
+      // drag handle
+      let startX, startLeft;
+      handle.addEventListener('mousedown', e => {
+        e.stopPropagation(); e.preventDefault();
+        startX = e.clientX; startLeft = handle.offsetLeft;
+        document.documentElement.addEventListener('mousemove', doDrag);
+        document.documentElement.addEventListener('mouseup', stopDrag);
+      });
+      function doDrag(e) {
+        const rect = segmentBar.getBoundingClientRect();
+        let delta = e.clientX - startX;
+        let newLeft = Math.min(Math.max(0, startLeft + delta), rect.width);
+        handle.style.left = newLeft + 'px';
+        const t = (newLeft / rect.width) * duration;
+        if (videoEl) videoEl.currentTime = t;
+        updateTimeLabel(t, duration);
+      }
+      function stopDrag() {
+        document.documentElement.removeEventListener('mousemove', doDrag);
+        document.documentElement.removeEventListener('mouseup', stopDrag);
+      }
+    }
 
-								<p>Vestibulum ultrices risus velit, sit amet blandit massa auctor sit amet. Sed eu lectus sem. Phasellus in odio at ipsum porttitor mollis id vel diam. Praesent sit amet posuere risus, eu faucibus lectus. Vivamus ex ligula, tempus pulvinar ipsum in, auctor porta quam. Proin nec dui cursus, posuere dui eget interdum. Fusce lectus magna, sagittis at facilisis vitae, pellentesque at etiam. Quisque posuere leo quis sem commodo, vel scelerisque nisi scelerisque. Suspendisse id quam vel tortor tincidunt suscipit. Nullam auctor orci eu dolor consectetur, interdum ullamcorper ante tincidunt. Mauris felis nec felis elementum varius.</p>
-
-								<hr />
-
-								<h4>Feugiat aliquam</h4>
-								<p>Nam sapien ante, varius in pulvinar vitae, rhoncus id massa. Donec varius ex in mauris ornare, eget euismod urna egestas. Etiam lacinia tempor ipsum, sodales porttitor justo. Aliquam dolor quam, semper in tortor eu, volutpat efficitur quam. Fusce nec fermentum nisl. Aenean erat diam, tempus aliquet erat.</p>
-
-								<p>Etiam iaculis nulla ipsum, et pharetra libero rhoncus ut. Phasellus rutrum cursus velit, eget condimentum nunc blandit vel. In at pulvinar lectus. Morbi diam ante, vulputate et imperdiet eget, fermentum non dolor. Ut eleifend sagittis tincidunt. Sed viverra commodo mi, ac rhoncus justo. Duis neque ligula, elementum ut enim vel, posuere finibus justo. Vivamus facilisis maximus nibh quis pulvinar. Quisque hendrerit in ipsum id tellus facilisis fermentum. Proin mauris dui, at vestibulum sit amet, auctor bibendum neque.</p>
-
-							</div>
-						</section>
-					</article>
-
-				<!-- Footer -->
-					<footer id="footer">
-						<ul class="icons">
-							<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
-							<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
-							<li><a href="#" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
-							<li><a href="#" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
-							<li><a href="#" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
-						</ul>
-						<ul class="copyright">
-							<li>&copy; Untitled</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
-						</ul>
-					</footer>
-
-			</div>
-
-
-		<!-- Scripts -->
-			<script src="/js/jquery.min.js"></script>
-			<script src="/js/jquery.scrollex.min.js"></script>
-			<script src="/js/jquery.scrolly.min.js"></script>
-			<script src="/js/browser.min.js"></script>
-			<script src="/js/breakpoints.min.js"></script>
-			<script src="/js/util.js"></script>
-			<script src="/js/main.js"></script>
-
-	</body>
+    function updateTimeLabel(start, end) {
+      const fmt = t => { const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
+      timeLabel.textContent = `${fmt(start)} - ${fmt(end)}`;
+    }
+  </script>
+  
+  <!-- Scripts -->
+  		<script src="/js/jquery.min.js"></script>
+  		<script src="/js/jquery.scrollex.min.js"></script>
+  		<script src="/js/jquery.scrolly.min.js"></script>
+  		<script src="/js/browser.min.js"></script>
+  		<script src="/js/breakpoints.min.js"></script>
+  		<script src="/js/util.js"></script>
+  		<script src="/js/main.js"></script>
+</body>
 </html>
