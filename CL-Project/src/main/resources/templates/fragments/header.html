@@ -46,19 +46,44 @@
 	        <input type="password" placeholder="비밀번호" required />
 	        <input type="password" placeholder="비밀번호 확인" required />
 
-	        <!--<button type="submit">가입하기</button>-->
-			<button class="button" type="submit">
+	        <button type="submit">가입하기</button>
+			<!--<button class="button" type="submit">
 			  <div class="button-outer">
 			    <div class="button-inner">
 			      <span>가입하기</span>
 			    </div>
 			  </div>
-			</button>
+			</button>-->
 	        <button type="button" onclick="toggleSignupPopup()">닫기</button>
 	      </form>
 	    </div>
 	  </div>
 	</div>
+	
+	<video id="webcam" autoplay playsinline width="320" height="240"></video>
+	<script>
+	// 1) 웹캠 스트림 요청
+	navigator.mediaDevices.getUserMedia({ video: true })
+	  .then(stream => {
+	    const video = document.getElementById('webcam');
+	    video.srcObject = stream;
+
+	    // 2) 일정 간격으로 프레임 캡처 및 전송
+	    const canvas = document.createElement('canvas');
+	    canvas.width = video.videoWidth;
+	    canvas.height = video.videoHeight;
+	    const ctx = canvas.getContext('2d');
+	    setInterval(() => {
+	      ctx.drawImage(video, 0, 0);
+	      canvas.toBlob(blob => {
+	        const form = new FormData();
+	        form.append('frame', blob, 'frame.jpg');
+	        // 3) Spring Boot로 POST
+	        fetch('/api/gaze/frame', { method: 'POST', body: form });
+	      }, 'image/jpeg');
+	    }, 200); // 5fps
+	  });
+	</script>
 
 	<script>
 		function toggleLoginPopup() {
