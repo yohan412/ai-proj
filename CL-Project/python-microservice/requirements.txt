@@ -1,8 +1,8 @@
-Flask
-faster-whisper
-google-generativeai
-networkx
---extra-index-url https://download.pytorch.org/whl/cu118
-torch
-torchvision
-torchaudio
+Flask==3.0.3
+flask-cors==4.0.1
+torch>=2.1
+torchvision>=0.16
+pillow
+numpy
+insightface>=0.7.3
+onnxruntime

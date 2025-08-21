@@ -67,6 +67,12 @@
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 		-->
+		
+		<!-- RestClient(동기 HTTP 클라이언트) -->
+	    <dependency>
+	      <groupId>org.springframework.boot</groupId>
+	      <artifactId>spring-boot-starter-restclient</artifactId>
+	    </dependency>
 
 		<!-- Oracle JDBC Driver -->
 		<!--
