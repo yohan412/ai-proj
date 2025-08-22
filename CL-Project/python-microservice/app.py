@@ -1,58 +1,80 @@
-# app.py
-import io, base64, time
-from PIL import Image
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+import os
+import pathlib
+import tempfile
 
-from l2cs_model import GazeEngine   # 모든 로직은 이쪽으로 위임
+from config import Settings
+from services.transcriber import transcribe_file
+from services.chapterizer import make_chapters
 
 app = Flask(__name__)
-CORS(app)
-
-# 엔진 초기화 (가중치/디바이스/입력 크기/검출 크기는 l2cs_model.py의 환경변수로 제어)
-ENGINE = GazeEngine()
+cfg = Settings.from_env()
 
 @app.get("/health")
 def health():
-    return jsonify(ENGINE.health())
+    return jsonify({
+        "ok": True,
+        "whisper_model": cfg.WHISPER_MODEL,
+        "llm_base_url": cfg.LLM_BASE_URL,
+        "llm_model": cfg.LLM_MODEL
+    })
 
-@app.post("/infer")
-def infer():
+@app.post("/analyze")
+def analyze():
     """
-    입력(JSON):
-      { "imageBase64": "<base64 jpeg/png payload (data-url prefix 없이)>" }
-
-    출력(JSON):
-      - 성공: { "yaw": <float>, "pitch": <float>, "latency_ms": <int> }
-      - 얼굴 X: { "message": "no_face", "latency_ms": <int> }
-      - 오류:  { "error": "...", "detail": "..." }
+    멀티파트: file (video/*)
+    쿼리: lang (ko|en|... 선택, 미지정 시 Whisper 자동 감지)
+    응답(JSON):
+    {
+      "format": "json",
+      "duration": <float sec>,
+      "segments": [{"start":..,"end":..,"text":".."}, ...],
+      "chapters": [{"start":..,"end":..,"title":"..","summary":".."}, ...]
+    }
     """
-    t0 = time.time()
-    data = request.get_json(silent=True) or {}
-    b64 = data.get("imageBase64")
-    if not b64:
-        return jsonify({"error": "imageBase64 required"}), 400
+    lang = request.args.get("lang")
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "no file"}), 400
 
-    try:
-        img_bytes = base64.b64decode(b64)
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    except Exception as e:
-        return jsonify({"error": "decode_failed", "detail": str(e)}), 400
+    with tempfile.TemporaryDirectory() as td:
+        suffix = pathlib.Path(f.filename).suffix or ".mp4"
+        in_path = os.path.join(td, "input" + suffix)
+        f.save(in_path)
 
-    try:
-        out = ENGINE.infer_from_pil(img)
-        latency = int((time.time() - t0) * 1000)
-        if out is None:
-            return jsonify({"message": "no_face", "latency_ms": latency})
-        out["latency_ms"] = latency
-        return jsonify(out)
-    except Exception as e:
-        return jsonify({"error": "inference_failed", "detail": str(e)}), 500
+        # 1) Whisper 자막 추출 (서비스로 분리)
+        duration, segments = transcribe_file(
+            file_path=in_path,
+            language=lang,
+            whisper_model=cfg.WHISPER_MODEL,
+            use_fp16=cfg.WHISPER_FP16
+        )
+
+        # 2) gpt-oss-20b 챕터 생성 (서비스로 분리)
+        chapters = []
+        if segments:
+            try:
+                chapters = make_chapters(
+                    segments=segments,
+                    duration=duration,
+                    lang=lang,
+                    llm_base_url=cfg.LLM_BASE_URL,
+                    llm_model=cfg.LLM_MODEL,
+                    llm_api_key=cfg.LLM_API_KEY,
+                    max_segments_for_prompt=cfg.MAX_SEGMENTS_FOR_PROMPT
+                )
+            except Exception as e:
+                # LLM 실패해도 Whisper 결과는 반환
+                app.logger.exception("chapterization failed: %s", e)
+                chapters = []
+
+        return jsonify({
+            "format": "json",
+            "duration": duration,
+            "segments": segments,
+            "chapters": chapters
+        })
 
 if __name__ == "__main__":
-    # 환경변수 예시:
-    #  export L2CS_WEIGHTS=models/L2CSNet_gaze360.pkl
-    #  export L2CS_INPUT_SIZE=224
-    #  export L2CS_DEVICE=cuda
-    #  export L2CS_DET_W=320; export L2CS_DET_H=320
-    app.run(host="0.0.0.0", port=8001)
+    # 운영에서는 debug=False 권장
+    app.run(host="0.0.0.0", port=5001, debug=False)
