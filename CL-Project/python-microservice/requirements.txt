@@ -1,0 +1,17 @@
+flask==3.0.3
+gunicorn==21.2.0
+
+# Whisper(비디오 파일 처리에 FFmpeg 필요)
+faster-whisper>=1.0.0
+
+# HF Transformers & 런타임
+transformers>=4.44.0
+accelerate>=0.30.0
+sentencepiece>=0.1.99
+safetensors>=0.4.3
+
+# 4bit(리눅스/CUDA 권장, Windows 미지원)
+bitsandbytes>=0.43.0
+
+python-dotenv>=1.0
+requests>=2.31
