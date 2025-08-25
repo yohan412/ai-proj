@@ -3,455 +3,366 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>영상 편집 툴 (챕터 구간 시각화)</title>
+  <title>영상 편집 툴</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/login.css" />
+  <noscript><link rel="stylesheet" href="/css/noscript.css" /></noscript>
 
   <style>
     :root{
       --bg:#2e3842; --panel:#242c35; --panel-2:#1f252c; --line:#3c4550;
-      --text:#e7f1ff; --muted:#9fb3c8; --accent:#1f90ff; --marker:#1f90ff; --end:#ff7a59;
-      --band:rgba(31,144,255,.18);
-      --min-shell:1200px; --min-preview-h:420px; --min-timeline-h:200px;
-    }
-    *{ box-sizing:border-box; }
-    body{ margin:0; background:var(--bg); color:#fff; font-family:Arial, Helvetica, sans-serif; }
+      --text:#e7f1ff; --muted:#9fb3c8; --accent:#1f90ff;
 
-    /* ===== 2열 레이아웃 + 최소 폭 보장 ===== */
-    .editor-container{ height:100vh; padding:24px; display:flex; justify-content:center; align-items:center; overflow-x:auto; overflow-y:hidden; }
-    .editor-shell{ width:100%; max-width:1400px; min-width:var(--min-shell); height:92vh; display:grid; gap:16px; grid-template-columns:minmax(700px,1fr) 560px; }
+      /* 최소 크기(원하는 값으로 조정) */
+      --min-shell-width:1280px;   /* 전체 최소 가로(2열 유지) */
+      --min-shell-height:760px;   /* 전체 최소 세로 */
+      --min-preview-h:420px;      /* 프리뷰 최소 세로 */
+      --min-timeline-h:200px;     /* 타임라인 최소 세로 */
+    }
+
+    *{ box-sizing:border-box; }
+    html, body{
+      height:100%; margin:0; background:var(--bg); color:#fff;
+      font-family:Arial, Helvetica, sans-serif;
+      overflow-x:auto; overflow-y:auto; /* 문서가 스크롤 담당 */
+    }
+
+    /* ===== 2열 레이아웃(원본 유지, 접히지 않음) ===== */
+    .editor-container{
+      width:100%; padding:24px; display:flex; justify-content:center; align-items:flex-start;
+      overflow:visible; min-width:var(--min-shell-width); min-height:var(--min-shell-height);
+    }
+    .editor-shell{
+      width:100%; max-width:1400px; min-width:var(--min-shell-width); min-height:var(--min-shell-height);
+      display:grid; gap:16px; grid-template-columns:minmax(700px,1fr) 560px;
+    }
 
     /* ===== 왼쪽 편집기 ===== */
-    .editor-inner{ display:flex; flex-direction:column; height:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; overflow:hidden; box-shadow:0 0 10px rgba(0,0,0,.3); min-width:700px; }
-    .preview-area{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:var(--panel-2); cursor:pointer; min-height:var(--min-preview-h); }
+    .editor-inner{
+      display:flex; flex-direction:column; background:var(--panel-2);
+      border:1px solid var(--line); border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,.3);
+      min-height:calc(var(--min-preview-h) + var(--min-timeline-h) + 64px);
+      overflow:visible;
+    }
+    .preview-area{
+      flex:1; position:relative; display:grid; place-items:center;
+      background:var(--panel-2); cursor:pointer; min-height:var(--min-preview-h);
+    }
     .preview-area.dragover{ outline:2px dashed var(--accent); }
-    .preview-area video, .preview-area img{ max-height:100%; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+    .preview-area video, .preview-area img{
+      max-width:100%; max-height:100%; object-fit:contain; border-radius:8px;
+      box-shadow:0 4px 20px rgba(0,0,0,.5); display:block;
+    }
     #video-input{ display:none; }
 
     /* ===== 타임라인 ===== */
-    .timeline-container{ position:relative; background:var(--panel); padding:48px 20px 20px; border-top:1px solid var(--line); min-height:var(--min-timeline-h); }
-    .segment-bar{ position:absolute; top:12px; left:20px; right:20px; height:8px; background:rgba(255,255,255,.25); border-radius:4px; z-index:2; cursor:pointer; }
-    /* 구간 밴드(각 챕터 범위 시각화) */
-    .range-band{ position:absolute; top:0; height:8px; background:var(--band); border-radius:4px; z-index:2; pointer-events:none; }
-    .range-band.active{ box-shadow:0 0 0 2px var(--accent) inset; }
-
-    /* 마커 (시작/종료) */
-    .marker{ position:absolute; top:-10px; width:2px; height:28px; background:var(--marker); border-radius:1px; z-index:4; cursor:ew-resize; box-shadow:0 0 6px rgba(31,144,255,.6); }
-    .marker::after{ content:""; position:absolute; left:50%; transform:translateX(-50%); top:-8px; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:10px solid var(--marker); filter:drop-shadow(0 0 4px rgba(31,144,255,.6)); }
-    .marker.end{ background:var(--end); }
-    .marker.end::after{ border-top-color:var(--end); }
-    .marker.active{ background:#fff; width:3px; box-shadow:0 0 10px rgba(255,255,255,.9); }
-    .marker.active::after{ border-top-color:#fff; filter:drop-shadow(0 0 6px rgba(255,255,255,.9)); }
-
-    /* 시간 레이블 (좌/우 고정) */
-    .time-label{ position:absolute; top:28px; font-size:12px; color:rgba(255,255,255,.85); z-index:2; }
-    .time-label.start{ left:20px; }
-    .time-label.end{ right:20px; }
-
-    .timeline{ display:flex; align-items:center; gap:10px; margin-top:28px; overflow-x:auto; padding-bottom:4px; }
-    .timeline-item{ position:relative; flex:0 0 auto; width:130px; height:100px; background:#3d4754; border-radius:6px; transition:transform .2s; overflow:hidden; display:flex; align-items:center; justify-content:center; color:#c7d2de; font-size:12px; border:1px solid transparent; min-width:130px; min-height:100px; }
-    .timeline-item:hover{ transform:scale(1.03); background:#505c6a; border-color:#637386; }
-    .timeline-item img{ width:100%; height:100%; object-fit:cover; display:block; }
-    .timeline-item .thumb-label{ position:absolute; left:6px; right:6px; bottom:6px; background:rgba(0,0,0,.45); color:#e7f1ff; font-size:11px; padding:2px 4px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    /* 빈 상자: + 아이콘 */
-    .timeline-item.empty::after{ content:"+"; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:36px; font-weight:700; color:#d3deeb; opacity:.85; line-height:1; pointer-events:none; text-shadow:0 0 6px rgba(31,144,255,.35); }
-    .timeline-item.active{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 0 16px rgba(31,144,255,.35) inset; }
+    .timeline-container{
+      position:relative; background:var(--panel); padding:40px 20px 20px;
+      border-top:1px solid var(--line); min-height:var(--min-timeline-h); overflow:visible;
+    }
+    .timeline-container .segment-bar{
+      position:absolute; top:10px; left:20px; right:20px; height:6px;
+      background:rgba(255,255,255,.3); border-radius:3px; z-index:2; cursor:pointer;
+    }
+    .timeline-container .segment-bar .handle{
+      position:absolute; top:-4px; width:12px; height:14px;
+      background:rgba(255,255,255,.85); border-radius:3px; cursor:ew-resize; z-index:3;
+    }
+    .timeline-container .segment-bar .handle.start{ left:0; }
+    .timeline-container .time-label{
+      position:absolute; top:24px; left:20px; font-size:12px; color:rgba(255,255,255,.85); z-index:2;
+    }
+    .timeline{ display:flex; align-items:center; margin-top:25px; }
+    .timeline-item{
+      flex:0 0 auto; width:100px; height:100px; background:#3d4754;
+      margin-right:10px; border-radius:6px; transition:transform .2s;
+    }
+    .timeline-item:hover{ transform:scale(1.05); background:#505c6a; }
 
     /* ===== 오른쪽 패널 ===== */
-    .right-panel{ background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,.3); display:flex; flex-direction:column; min-width:560px; overflow:auto; }
-    .panel-header{ padding:10px 12px; border-bottom:1px solid var(--line); font-size:12px; letter-spacing:2px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; }
-    .controls-row{ display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); }
-    .btn{ background:var(--accent); color:white; border:0; border-radius:6px; padding:8px 12px; cursor:pointer; font-weight:600; }
-    .btn[disabled]{ opacity:.6; cursor:not-allowed; }
-    .status{ font-size:12px; color:#9fb3c8; margin-left:8px; }
-    .chapters{ padding:12px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
-    .chapter-card{ background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px; display:grid; gap:6px; cursor:pointer; }
-    .chapter-card:hover{ border-color:#637386; }
-    .chapter-card.active{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; }
-    .chapter-title{ font-weight:700; font-size:14px; }
-    .chapter-time{ font-size:12px; color:#c9d6e3; }
-    .chapter-summary{ font-size:13px; color:#e7f1ff; opacity:.95; }
-    @media (max-width: 1100px){ .editor-shell{ grid-template-columns:1fr; height:auto; } .right-panel{ min-width:0; } }
+    .right-panel{
+      background:var(--panel); border:1px solid var(--line); border-radius:8px;
+      box-shadow:0 0 10px rgba(0,0,0,.3); display:flex; flex-direction:column;
+      min-width:560px; min-height:var(--min-shell-height); overflow:visible;
+    }
+    .panel-header{
+      padding:10px 12px; border-bottom:1px solid var(--line);
+      font-size:12px; letter-spacing:2px; color:var(--muted);
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+    }
+    .panel-actions{ display:flex; align-items:center; gap:8px; }
+
+    /* 버튼 스타일 */
+    .btn{
+      appearance:none; border:1px solid var(--line); background:var(--panel-2);
+      color:var(--text); padding:8px 12px; border-radius:8px; cursor:pointer;
+      font-size:12px; letter-spacing:1px; transition:transform .06s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .btn:hover{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.3); }
+    .btn:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
+    .btn-accent{ border-color:#1578d8; background:#1f90ff22; }
+    .btn-accent:hover{ background:#1f90ff33; }
+    .btn-loading{ position:relative; color:#cfe6ff; }
+    .btn-loading::after{
+      content:""; position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      width:12px; height:12px; border:2px solid #cfe6ff; border-top-color:transparent; border-radius:50%;
+      animation:spin 0.8s linear infinite;
+    }
+    @keyframes spin{ to{ transform:translateY(-50%) rotate(360deg); } }
+
+    .vtext-preview{
+      flex:1; margin:12px; background:var(--panel-2);
+      border:1px dashed var(--line); border-radius:6px;
+      display:flex; align-items:flex-start; justify-content:flex-start;
+      padding:10px 12px; min-height:220px; overflow:visible;
+    }
+    .vtext-list{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; width:100%; }
+    .vtext-line{ white-space:pre-wrap; word-break:break-word; line-height:1.25; color:#fff; text-align:left; }
   </style>
 </head>
 <body>
-  <!-- 좌측 비디오 업로드 input (좌측 프리뷰용) -->
-  <input type="file" id="video-input" accept="video/*" hidden>
+  <div th:replace="~{fragments/header :: header}"></div>
+
+  <input type="file" id="video-input" accept="video/*">
 
   <div class="editor-container">
     <div class="editor-shell">
-      <!-- ===== 왼쪽: 프리뷰 + 타임라인 ===== -->
+
+      <!-- ===== 왼쪽: 편집기 ===== -->
       <div class="editor-inner">
-        <div class="preview-area" id="preview-area" title="클릭 또는 드래그&드롭으로 영상 불러오기">
-          <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
+        <div class="preview-area" id="preview-area">
+          <img id="preview-media" alt="video preview"
+               src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
         </div>
 
-        <div class="timeline-container">
-          <div class="segment-bar" id="segment-bar"></div>
-          <span class="time-label start" id="time-label-start">0:00</span>
-          <span class="time-label end" id="time-label-end">0:00</span>
-
+        <div class="timeline-container" id="timeline-container">
+          <div class="segment-bar" id="segment-bar">
+            <div class="handle start" id="start-handle"></div>
+          </div>
+          <span class="time-label" id="time-label">0:00 - 0:00</span>
           <div class="timeline" id="timeline">
-            <div class="timeline-item empty" data-filled="false"></div>
+            <div class="timeline-item"></div>
           </div>
         </div>
       </div>
 
-      <!-- ===== 오른쪽: 분석 버튼 + 챕터 카드 ===== -->
+      <!-- ===== 오른쪽: 텍스트 미리보기 ===== -->
       <aside class="right-panel">
-        <div class="panel-header"><span>CHAPTERS</span></div>
-        <div class="controls-row">
-          <button id="btn-analyze" class="btn" type="button">자막·챕터 분석</button>
-          <span class="status" id="status">좌측에서 영상을 불러온 뒤 분석을 실행하세요.</span>
+        <div class="panel-header">
+          <span>TEXT</span>
+          <div class="panel-actions">
+            <button id="analyze-btn" class="btn btn-accent">분석</button>
+          </div>
         </div>
-        <div id="chapters" class="chapters"></div>
+
+        <div class="vtext-preview">
+          <div id="vtext-list" class="vtext-list">
+            <div class="vtext-line">첫 줄 텍스트</div>
+            <div class="vtext-line">둘째 줄 텍스트</div>
+            <div class="vtext-line">셋째 줄 텍스트</div>
+          </div>
+        </div>
       </aside>
+
     </div>
   </div>
 
+  <script src="/js/jquery.min.js"></script>
   <script>
-    /* ===== 요소 참조 ===== */
-    const fileInput = document.getElementById('video-input');
+    /* ===== 기본 참조 ===== */
+    const input = document.getElementById('video-input');
     const previewArea = document.getElementById('preview-area');
     const segmentBar = document.getElementById('segment-bar');
-    const timeLabelStart = document.getElementById('time-label-start');
-    const timeLabelEnd = document.getElementById('time-label-end');
-    const timeline = document.getElementById('timeline');
-    const btnAnalyze = document.getElementById('btn-analyze');
-    const statusEl = document.getElementById('status');
-    const chaptersWrap = document.getElementById('chapters');
+    const handle = document.getElementById('start-handle');
+    const timeLabel = document.getElementById('time-label');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const vtextList = document.getElementById('vtext-list');
 
-    let videoEl, duration = 0, currentVideoFile = null;
-    let idSeq = 1;
-    // pair: 챕터와 연결된 구조 (시작/종료 마커 + 밴드 + 썸네일)
-    const pairs = new Map(); // id -> { id, start, end, startMarker, endMarker, band, thumb, meta }
-    let activeId = null;
+    let videoEl, duration = 0;
+    let currentFile = null;     // ← 업로드 원본을 저장해 서버로 보냄
+    let currentURL = null;
 
-    /* ===== 업로드 / 로드 ===== */
-    previewArea.addEventListener('click', (e)=>{ if(e.target.tagName.toLowerCase()!=='video') fileInput.click(); });
+    /* ===== 파일 선택/드래그 ===== */
+    previewArea.addEventListener('click', (e)=>{
+      if(e.target.tagName.toLowerCase()==='video') return;
+      input.click();
+    });
     previewArea.addEventListener('dragover', e=>{ e.preventDefault(); previewArea.classList.add('dragover'); });
     previewArea.addEventListener('dragleave', ()=> previewArea.classList.remove('dragover'));
     previewArea.addEventListener('drop', e=>{
       e.preventDefault(); previewArea.classList.remove('dragover');
-      const f = e.dataTransfer.files?.[0];
-      if(f && f.type.startsWith('video/')) loadVideo(f);
+      const file = e.dataTransfer.files?.[0];
+      if(file && file.type.startsWith('video/')) loadVideo(file);
     });
-    fileInput.addEventListener('change', e=>{
-      const f = e.target.files?.[0];
-      if(f && f.type.startsWith('video/')) loadVideo(f);
+    input.addEventListener('change', e=>{
+      const file = e.target.files?.[0];
+      if(file && file.type.startsWith('video/')) loadVideo(file);
     });
 
     function loadVideo(file){
-      currentVideoFile = file;
-      const url = URL.createObjectURL(file);
+      /* 기존 미디어 URL 정리 */
+      if(currentURL) URL.revokeObjectURL(currentURL);
+      currentFile = file;
+      currentURL = URL.createObjectURL(file);
+
       previewArea.innerHTML = '';
       videoEl = document.createElement('video');
-      videoEl.src = url; videoEl.controls = true;
+      videoEl.src = currentURL;
+      videoEl.controls = true;
+      videoEl.style.maxWidth = '100%';
       videoEl.style.maxHeight = '100%';
-      videoEl.style.maxWidth  = '100%';
       videoEl.style.objectFit = 'contain';
+      videoEl.style.borderRadius = '8px';
       previewArea.appendChild(videoEl);
 
+      duration = 0;
       videoEl.addEventListener('loadedmetadata', ()=>{
         duration = videoEl.duration || 0;
-        updateTimeLabel(0, duration);
-        resetTimeline();
-        statusEl.textContent = '영상 로드 완료. [자막·챕터 분석]을 눌러 주세요.';
-      }, { once:true });
+        initSegmentControls();
+      });
     }
 
-    /* ===== 타임라인 유틸 ===== */
+    function initSegmentControls(){
+      handle.style.left = '0px';
+      updateTimeLabel(0, duration);
+      bindSegmentEvents();
+    }
+
+    function bindSegmentEvents(){
+      segmentBar.addEventListener('click', e=>{
+        const rect = segmentBar.getBoundingClientRect();
+        const offset = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
+        const t = duration * (offset / rect.width);
+        if(videoEl) videoEl.currentTime = t;
+        handle.style.left = offset + 'px';
+        updateTimeLabel(t, duration);
+      });
+
+      let startX, startLeft;
+      handle.addEventListener('mousedown', e=>{
+        e.stopPropagation(); e.preventDefault();
+        startX = e.clientX; startLeft = handle.offsetLeft;
+        document.documentElement.addEventListener('mousemove', doDrag);
+        document.documentElement.addEventListener('mouseup', stopDrag);
+      });
+      function doDrag(e){
+        const rect = segmentBar.getBoundingClientRect();
+        let delta = e.clientX - startX;
+        let newLeft = Math.min(Math.max(0, startLeft + delta), rect.width);
+        handle.style.left = newLeft + 'px';
+        const t = duration * (newLeft / rect.width);
+        if(videoEl) videoEl.currentTime = t;
+        updateTimeLabel(t, duration);
+      }
+      function stopDrag(){
+        document.documentElement.removeEventListener('mousemove', doDrag);
+        document.documentElement.removeEventListener('mouseup', stopDrag);
+      }
+    }
+
     function updateTimeLabel(start, end){
       const fmt = t => { const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
-      timeLabelStart.textContent = fmt(start);
-      timeLabelEnd.textContent   = fmt(end);
-    }
-    function resetTimeline(){
-      // 마커/밴드 제거
-      [...segmentBar.querySelectorAll('.marker, .range-band')].forEach(el => el.remove());
-      // 썸네일 초기화
-      timeline.innerHTML = '';
-      const empty = document.createElement('div');
-      empty.className = 'timeline-item empty';
-      empty.dataset.filled = 'false';
-      timeline.appendChild(empty);
-      // 상태 초기화
-      pairs.clear(); activeId = null; idSeq = 1;
-    }
-    function fracToLeft(frac){ const r = segmentBar.getBoundingClientRect(); return Math.round(frac * r.width); }
-    function timeToLeft(t){ return fracToLeft(duration ? (t/duration) : 0); }
-    function leftToTime(left){ const r = segmentBar.getBoundingClientRect(); const f = r.width ? left / r.width : 0; return Math.max(0, Math.min(duration, f*duration)); }
-
-    /* ===== 페어 생성 ===== */
-    function createChapterPair(chapter, thumbEl){
-      const id = idSeq++;
-      const start = clamp(chapter.start, 0, duration);
-      const end   = clamp(chapter.end,   0, duration);
-
-      // 밴드
-      const band = document.createElement('div');
-      band.className = 'range-band';
-      segmentBar.appendChild(band);
-
-      // 시작/종료 마커
-      const mStart = document.createElement('div');
-      mStart.className = 'marker start';
-      mStart.dataset.role = 'start';
-      mStart.dataset.id = String(id);
-
-      const mEnd = document.createElement('div');
-      mEnd.className = 'marker end';
-      mEnd.dataset.role = 'end';
-      mEnd.dataset.id = String(id);
-
-      segmentBar.appendChild(mStart);
-      segmentBar.appendChild(mEnd);
-
-      // 썸네일
-      thumbEl.dataset.id = String(id);
-      thumbEl.dataset.filled = 'true';
-      thumbEl.classList.remove('empty');
-
-      // 상태 저장
-      const meta = { chapter };
-      pairs.set(id, { id, start, end, startMarker:mStart, endMarker:mEnd, band, thumb:thumbEl, meta });
-
-      positionPair(id);
-      enableMarkerDrag(mStart);
-      enableMarkerDrag(mEnd);
-
-      // 활성화/클릭
-      [mStart, mEnd, band].forEach(el=>{
-        el.addEventListener('mousedown', ()=> setActive(id));
-        el.addEventListener('click', (e)=>{ e.stopPropagation(); setActive(id); });
-      });
-
-      return id;
+      timeLabel.textContent = `${fmt(start)} - ${fmt(end)}`;
     }
 
-    function positionPair(id){
-      const p = pairs.get(id); if(!p) return;
-      const leftS = timeToLeft(p.start);
-      const leftE = timeToLeft(p.end);
-      const l = Math.min(leftS, leftE), r = Math.max(leftS, leftE);
-      p.startMarker.style.left = leftS + 'px';
-      p.endMarker.style.left   = leftE + 'px';
-      p.band.style.left = l + 'px';
-      p.band.style.width = Math.max(2, r - l) + 'px';
-    }
-
-    function setActive(id){
-      activeId = id;
-      document.querySelectorAll('.timeline-item').forEach(el=> el.classList.remove('active'));
-      document.querySelectorAll('.marker').forEach(el=> el.classList.remove('active'));
-      document.querySelectorAll('.range-band').forEach(el=> el.classList.remove('active'));
-      const p = pairs.get(id);
-      if(p){
-        p.thumb.classList.add('active');
-        p.startMarker.classList.add('active');
-        p.endMarker.classList.add('active');
-        p.band.classList.add('active');
+    /* ===== 분석 버튼 ===== */
+    analyzeBtn.addEventListener('click', async ()=>{
+      if(!currentFile){
+        alert('먼저 영상 파일을 업로드하세요.');
+        return;
       }
-      highlightChapterCardById(id);
-    }
+      setAnalyzeLoading(true);
 
-    function enableMarkerDrag(marker){
-      let sx, sl, dragging = false;
-      const id = Number(marker.dataset.id);
-      const role = marker.dataset.role; // 'start' | 'end'
-
-      const down = e=>{
-        e.preventDefault(); dragging = true; sx = e.clientX; sl = marker.offsetLeft;
-        setActive(id);
-        document.addEventListener('mousemove', move);
-        document.addEventListener('mouseup', up);
-      };
-      const move = e=>{
-        if(!dragging) return;
-        const r = segmentBar.getBoundingClientRect();
-        const nl = Math.min(Math.max(0, sl + (e.clientX - sx)), r.width);
-        marker.style.left = nl + 'px';
-        // 실시간 밴드 미리보기
-        const p = pairs.get(id); if(!p) return;
-        const tMoved = leftToTime(nl);
-        if(role === 'start'){ p.start = Math.min(tMoved, p.end); }
-        else { p.end = Math.max(tMoved, p.start); }
-        positionPair(id);
-      };
-      const up = async ()=>{
-        if(!dragging) return; dragging = false;
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', up);
-
-        // 썸네일 갱신(시작 시점 기준)
-        const p = pairs.get(id);
-        if(p) await updateThumbFromTime(id, labelForChapter(p.meta.chapter, p));
-      };
-      marker.addEventListener('mousedown', down);
-    }
-
-    function ensureTrailingEmptyThumb(){
-      const last = timeline.lastElementChild;
-      if(!last || last.dataset.filled === 'true'){
-        const box = document.createElement('div');
-        box.className = 'timeline-item empty';
-        box.dataset.filled = 'false';
-        timeline.appendChild(box);
-      }
-    }
-
-    // 썸네일 클릭 → 해당 챕터로 이동
-    timeline.addEventListener('click', e=>{
-      const item = e.target.closest('.timeline-item');
-      if(!item) return;
-      const id = Number(item.dataset.id || 0);
-      if(id && pairs.has(id)){
-        setActive(id);
-        const p = pairs.get(id);
-        if(videoEl) videoEl.currentTime = p.start;
-      }
-    });
-
-    window.addEventListener('resize', ()=>{ pairs.forEach((_, id)=> positionPair(id)); });
-
-    // 프레임 캡처
-    function captureFrameAt(time){
-      return new Promise((resolve, reject)=>{
-        if(!videoEl) return reject(new Error('no video'));
-        const onSeeked = ()=>{
-          try{
-            const canvas = document.createElement('canvas');
-            const w = videoEl.videoWidth || 640, h = videoEl.videoHeight || 360;
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(videoEl, 0, 0, w, h);
-            const url = canvas.toDataURL('image/jpeg', 0.85);
-            videoEl.removeEventListener('seeked', onSeeked);
-            resolve(url);
-          }catch(err){ videoEl.removeEventListener('seeked', onSeeked); reject(err); }
-        };
-        videoEl.addEventListener('seeked', onSeeked, { once:true });
-        videoEl.currentTime = Math.min(Math.max(0, time), duration || 0);
-      });
-    }
-
-    async function updateThumbFromTime(id, labelText = ''){
-      const p = pairs.get(id); if(!p) return;
-      try{
-        const url = await captureFrameAt(p.start);
-        p.thumb.innerHTML = '';
-        const img = document.createElement('img'); img.src = url;
-        p.thumb.appendChild(img);
-        if(labelText){
-          const lab = document.createElement('div');
-          lab.className = 'thumb-label';
-          lab.textContent = labelText;
-          p.thumb.appendChild(lab);
-        }
-      }catch(err){ console.error('frame capture error', err); }
-    }
-
-    /* ===== 우측: 챕터 카드 ===== */
-    function toSrtTime(sec){
-      const n = Math.max(0, Number(sec) || 0);
-      const h = Math.floor(n/3600);
-      const m = Math.floor((n%3600)/60);
-      const s = Math.floor(n%60);
-      const ms = Math.round((n - Math.floor(n)) * 1000);
-      const pad = (x, l=2) => String(x).padStart(l,'0');
-      return `${pad(h)}:${pad(m)}:${pad(s)},${String(ms).padStart(3,'0')}`;
-    }
-    function labelForChapter(ch, pair){ return `${(pair?.meta?.index ?? 0)+1}. ${ch.title || '제목 없음'}`; }
-
-    function renderChaptersList(chapters, idMap){
-      chaptersWrap.innerHTML = '';
-      chapters.forEach((ch, idx)=>{
-        const card = document.createElement('div');
-        card.className = 'chapter-card';
-        card.dataset.pairId = String(idMap[idx]);
-
-        const title = document.createElement('div');
-        title.className = 'chapter-title';
-        title.textContent = `${idx+1}. ${ch.title || '제목 없음'}`;
-
-        const tm = document.createElement('div');
-        tm.className = 'chapter-time';
-        tm.textContent = `${toSrtTime(ch.start)} → ${toSrtTime(ch.end)}`;
-
-        const sum = document.createElement('div');
-        sum.className = 'chapter-summary';
-        sum.textContent = ch.summary || '';
-
-        card.appendChild(title); card.appendChild(tm); card.appendChild(sum);
-
-        card.addEventListener('click', ()=>{
-          const pid = Number(card.dataset.pairId);
-          setActive(pid);
-          const p = pairs.get(pid);
-          if(p && videoEl) videoEl.currentTime = p.start;
-        });
-
-        chaptersWrap.appendChild(card);
-      });
-    }
-    function highlightChapterCardById(pairId){
-      document.querySelectorAll('.chapter-card').forEach(el=> el.classList.remove('active'));
-      const card = [...document.querySelectorAll('.chapter-card')].find(el => Number(el.dataset.pairId) === pairId);
-      if(card) card.classList.add('active');
-    }
-
-    /* ===== 분석 호출(/api/analyze) ===== */
-    btnAnalyze.addEventListener('click', async ()=>{
-      if(!currentVideoFile){ alert('좌측에서 먼저 영상 파일을 불러와 주세요.'); return; }
-      btnAnalyze.disabled = true; statusEl.textContent = '분석 중... (Whisper → GPT-OSS-20B)';
       try{
         const fd = new FormData();
-        fd.append('file', currentVideoFile);
-        const res = await fetch('/api/analyze?lang=ko', { method:'POST', body: fd });
-        if(!res.ok) throw new Error('서버 오류');
-        const data = await res.json(); // {duration, segments, chapters}
+        fd.append('file', currentFile); // 서버가 저장 후 Flask로 전달
 
-        resetTimeline();
+        // 필요 시 CSRF 토큰 헤더 추가
+        const res = await fetch('/api/videos/analyze', {
+          method:'POST',
+          body: fd,
+          // credentials:'include', // 세션/쿠키 기반이면 주석 해제
+          // headers: { 'X-CSRF-TOKEN': tokenValue } // 필요 시
+        });
 
-        const chapters = Array.isArray(data.chapters) ? data.chapters : [];
-        // 챕터 개수만큼 썸네일 박스 생성
-        timeline.innerHTML = '';
-        for(let i=0;i<chapters.length;i++){
-          const box = document.createElement('div');
-          box.className = 'timeline-item';
-          box.dataset.filled = 'true';
-          timeline.appendChild(box);
-        }
-        ensureTrailingEmptyThumb(); // 끝에 빈 상자 하나
-
-        // 페어 생성 + 썸네일 라벨
-        const boxes = [...timeline.querySelectorAll('.timeline-item')].filter(el => el.dataset.filled === 'true');
-        const pairIds = [];
-        for(let i=0;i<chapters.length;i++){
-          const ch = chapters[i]; const box = boxes[i];
-          const id = createChapterPair(ch, box);
-          const p = pairs.get(id); if(p) p.meta.index = i;
-          pairIds.push(id);
-          await updateThumbFromTime(id, `${i+1}. ${ch.title||''}`);
+        const contentType = res.headers.get('content-type') || '';
+        if(!res.ok){
+          const msg = await res.text().catch(()=>res.statusText);
+          throw new Error(msg || '분석 요청 실패');
         }
 
-        // 첫 챕터 활성화
-        if(pairIds.length){ setActive(pairIds[0]); const p = pairs.get(pairIds[0]); if(p && videoEl) videoEl.currentTime = p.start; }
+        let lines = [];
+        if(contentType.includes('application/json')){
+          const json = await res.json();
+          if(Array.isArray(json.lines)) lines = json.lines;
+          else if(typeof json.srt === 'string') lines = parseSrt(json.srt);
+          else if(typeof json.vtt === 'string') lines = parseVtt(json.vtt);
+          else if(typeof json.text === 'string') lines = json.text.split(/\r?\n/).filter(Boolean);
+        }else{
+          const text = await res.text();
+          if(/WEBVTT/i.test(text)) lines = parseVtt(text);
+          else if(/\d+\s*\r?\n?\d{2}:\d{2}:\d{2}/.test(text)) lines = parseSrt(text);
+          else lines = text.split(/\r?\n/).filter(Boolean);
+        }
 
-        // 우측 카드 렌더
-        renderChaptersList(chapters, pairIds);
-
-        // 시간 라벨 갱신
-        updateTimeLabel(0, data.duration || duration);
-        statusEl.textContent = `완료: 챕터 ${chapters.length}개`;
+        renderLines(lines);
       }catch(err){
         console.error(err);
-        statusEl.textContent = '실패: ' + err.message;
-        alert('분석 중 오류가 발생했습니다.');
+        alert('분석 중 오류가 발생했습니다.\n' + (err?.message || ''));
       }finally{
-        btnAnalyze.disabled = false;
+        setAnalyzeLoading(false);
       }
     });
 
-    /* ===== 보조 유틸 ===== */
-    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+    function setAnalyzeLoading(isLoading){
+      analyzeBtn.disabled = isLoading;
+      analyzeBtn.classList.toggle('btn-loading', isLoading);
+      analyzeBtn.textContent = isLoading ? '분석중...' : '분석';
+    }
+
+    /* ===== SRT / VTT 파서 ===== */
+    function parseSrt(srt){
+      // 블록 단위 분리
+      const blocks = srt.replace(/\r/g,'').split(/\n{2,}/);
+      const out = [];
+      for(const b of blocks){
+        // 숫자/타임라인 제거하고 텍스트만 추출
+        const lines = b.split('\n')
+          .filter(l => !/^\s*\d+\s*$/.test(l)) // index
+          .filter(l => !/-->\s*/.test(l));     // time
+        const text = lines.join(' ').trim();
+        if(text) out.push(text);
+      }
+      return out;
+    }
+    function parseVtt(vtt){
+      const body = vtt.replace(/^WEBVTT[^\n]*\n+/i,'');
+      return parseSrt(body); // 형식이 유사하므로 재사용
+    }
+
+    function renderLines(lines){
+      vtextList.innerHTML = '';
+      if(!lines || !lines.length){
+        vtextList.innerHTML = '<div class="vtext-line">분석 결과가 비어 있습니다.</div>';
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      lines.forEach(t=>{
+        const div = document.createElement('div');
+        div.className = 'vtext-line';
+        div.textContent = t;
+        frag.appendChild(div);
+      });
+      vtextList.appendChild(frag);
+    }
   </script>
+
+  <!-- 필요시 테마 스크립트 -->
+  <script src="/js/jquery.scrollex.min.js"></script>
+  <script src="/js/jquery.scrolly.min.js"></script>
+  <script src="/js/browser.min.js"></script>
+  <script src="/js/breakpoints.min.js"></script>
+  <script src="/js/util.js"></script>
+  <script src="/js/main.js"></script>
 </body>
 </html>
