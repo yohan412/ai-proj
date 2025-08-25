@@ -52,6 +52,8 @@ def analyze():
 
         lang_for_chapter = (lang_query or detected_lang or "").lower()
 
+        print(segments)
+
         # 2) Chapters
         chapters = []
         if segments:

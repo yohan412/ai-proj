@@ -1,0 +1,15 @@
+<!-- fragments/topbar.html -->
+<div th:fragment="topbar">
+  <header class="topbar">
+    <div class="user-area">
+      <a href="#" id="loginButton" class="login-button">Login</a>
+      <div class="profile-container" style="display: none;">
+        <img src="/images/profile/default-avatar.png" alt="User Profile" class="profile-avatar" />
+        <div class="dropdown-menu" id="dropdownMenu">
+          <!--<a href="#">My Page</a>-->
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+  </header>
+</div>
