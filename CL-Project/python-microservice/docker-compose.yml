@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: cl-flask:cu124-cudnn9
     container_name: video-chapterizer
     restart: unless-stopped
     # TensorDock는 GPU를 할당해줍니다. Compose에선 gpus: all 로 요청
@@ -23,9 +24,9 @@ services:
       - LLM_PROVIDER=hf_local
       - HF_MODEL_ID=openai/gpt-oss-20b
       - HF_LOAD_IN_4BIT=true           # 리눅스 + CUDA면 true 권장
-      - HF_MAX_NEW_TOKENS=768          # 12GB VRAM이면 512~768 권장
+      - HF_MAX_NEW_TOKENS=1300          # 12GB VRAM이면 512~768 권장
       - HF_TEMPERATURE=0.2
-      - HF_MAX_GPU_MEMORY=10GiB        # 12GB GPU면 9~10GiB 권장(여유 남김)
+      - HF_MAX_GPU_MEMORY=20GiB        # 12GB GPU면 9~10GiB 권장(여유 남김)
       - HF_MAX_CPU_MEMORY=64GiB
       - HF_OFFLOAD_DIR=/offload
       - HF_LOW_CPU_MEM=true
@@ -46,7 +47,8 @@ services:
       - "5001:5001"
 
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:5001/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5001/health || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 5
+      timeout: 5s
+      retries: 10
+

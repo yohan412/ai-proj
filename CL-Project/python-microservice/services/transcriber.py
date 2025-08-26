@@ -2,11 +2,14 @@
 from typing import List, Dict, Tuple, Any, Optional
 from faster_whisper import WhisperModel
 import torch
+import os  # ★ NEW
 
 def _device_and_compute(use_fp16: bool) -> Tuple[str, str]:
     if torch.cuda.is_available():
+        # GPU 사용 시 fp16 또는 fp32
         return "cuda", ("float16" if use_fp16 else "float32")
-    return "cpu", "int8"  # CPU에서는 int8이 속도/메모리 유리
+    # CPU에서는 int8이 메모리/속도 유리
+    return "cpu", "int8"
 
 _model_cache: Dict[str, WhisperModel] = {}
 
@@ -14,7 +17,14 @@ def _get_model(name: str, use_fp16: bool) -> WhisperModel:
     key = f"{name}:{'fp16' if use_fp16 else 'fp32'}"
     if key not in _model_cache:
         device, compute_type = _device_and_compute(use_fp16)
-        _model_cache[key] = WhisperModel(name, device=device, compute_type=compute_type)
+        # ★ NEW: HF_HOME(볼륨) 재사용하여 모델 캐시 일관화
+        download_root = os.getenv("HF_HOME") or None  # ★ NEW
+        _model_cache[key] = WhisperModel(
+            name,
+            device=device,
+            compute_type=compute_type,
+            download_root=download_root,  # ★ NEW
+        )
     return _model_cache[key]
 
 def _round(x: float, n: int = 3) -> float:

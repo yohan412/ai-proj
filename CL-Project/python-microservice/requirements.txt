@@ -1,17 +1,14 @@
 flask==3.0.3
 gunicorn==21.2.0
 
-# Whisper(비디오 파일 처리에 FFmpeg 필요)
-faster-whisper>=1.0.0
+transformers==4.44.2
+accelerate==0.33.0
+bitsandbytes==0.44.1
+triton==2.3.1         # bnb가 triton 기반 모듈을 쓸 때 필요
 
-# HF Transformers & 런타임
-transformers>=4.44.0
-accelerate>=0.30.0
+# whisper 등 기타
+faster-whisper>=1.0.0
 sentencepiece>=0.1.99
 safetensors>=0.4.3
-
-# 4bit(리눅스/CUDA 권장, Windows 미지원)
-bitsandbytes>=0.43.0
-
 python-dotenv>=1.0
 requests>=2.31
