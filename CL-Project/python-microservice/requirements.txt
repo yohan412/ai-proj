@@ -1,5 +1,16 @@
-flask==3.0.3
-gunicorn==21.2.0
+# ===== Common runtime =====
+flask>=3.0,<4.0
+waitress>=2.1.2,<3.0
+gunicorn>=21.2,<22.0
+python-dotenv>=1.0.1,<2.0
+pydantic>=2.6,<3.0
+
+# ===== PyTorch (CPU only) =====
+# 주의: 아래 extra index가 있어야 CPU 전용 휠을 받습니다.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
+torchaudio==2.5.1+cpu
 
 transformers==4.44.2
 accelerate==0.33.0
@@ -12,3 +23,4 @@ sentencepiece>=0.1.99
 safetensors>=0.4.3
 python-dotenv>=1.0
 requests>=2.31
+# torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
