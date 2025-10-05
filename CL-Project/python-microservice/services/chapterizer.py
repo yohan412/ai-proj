@@ -102,11 +102,7 @@ def _get_pipe(
             config=hf_cfg,                                    # ★ NEW: 우리가 정리한 config를 강제 사용
         )
 
-<<<<<<< HEAD
         # Llama-3.1-8B-Instruct 모델용 토크나이저 설정
-=======
-        # 토크나이저
->>>>>>> f11bdd0b5e19b09685c2872dc58019d9888e5b01
         tok = AutoTokenizer.from_pretrained(
             model_id, 
             use_fast=True, 
@@ -129,7 +125,6 @@ def _get_pipe(
                     quantization_config=bnb_cfg,              # ★ CHANGED: 유일한 양자화 진입점
                     **common_kw                               # ★ CHANGED: config=hf_cfg 포함
                 )
-<<<<<<< HEAD
                 _pipe = pipeline(
                     "text-generation",
                     model=mdl, tokenizer=tok,
@@ -139,13 +134,8 @@ def _get_pipe(
                 )
                 _loaded_key = want
                 return _pipe
-            except Exception:
-                # 실패 시 FP 경로로 폴백
-                pass
-=======
             except Exception as e:
                 print(f"[chapterizer] 4bit load failed -> fallback FP. reason={e}")
->>>>>>> f11bdd0b5e19b09685c2872dc58019d9888e5b01
 
         if mdl is None:
             mdl = AutoModelForCausalLM.from_pretrained(

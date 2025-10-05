@@ -1,15 +1,10 @@
-<<<<<<< HEAD
+# ===== Common runtime =====
 flask==3.0.3
 flask-cors>=4.0.0
 gunicorn==21.2.0
-=======
-# ===== Common runtime =====
-flask>=3.0,<4.0
 waitress>=2.1.2,<3.0
-gunicorn>=21.2,<22.0
 python-dotenv>=1.0.1,<2.0
 pydantic>=2.6,<3.0
->>>>>>> f11bdd0b5e19b09685c2872dc58019d9888e5b01
 
 # ===== PyTorch (CPU only) =====
 # 주의: 아래 extra index가 있어야 CPU 전용 휠을 받습니다.
