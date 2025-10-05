@@ -1,4 +1,5 @@
 flask==3.0.3
+flask-cors>=4.0.0
 gunicorn==21.2.0
 
 # Whisper(비디오 파일 처리에 FFmpeg 필요)

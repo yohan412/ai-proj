@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.0-SNAPSHOT</version>
+		<version>3.3.5</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
@@ -29,7 +29,7 @@
 		<url/>
 	</scm>
 	<properties>
-		<java.version>21</java.version>
+		<java.version>17</java.version>
 	</properties>
 	<dependencies>
 		<!--신규추가-->
@@ -68,22 +68,21 @@
 		</dependency>
 		-->
 		
-		<!-- RestClient(동기 HTTP 클라이언트) -->
+		<!-- WebFlux for WebClient (HTTP 클라이언트) -->
 	    <dependency>
 	      <groupId>org.springframework.boot</groupId>
-	      <artifactId>spring-boot-starter-restclient</artifactId>
+	      <artifactId>spring-boot-starter-webflux</artifactId>
 	    </dependency>
 
 		<!-- Oracle JDBC Driver -->
-		<!--
+		
 		<dependency>
 			<groupId>com.oracle.database.jdbc</groupId>
 			<artifactId>ojdbc11</artifactId>
 			<version>23.3.0.23.09</version>
 		</dependency>
-		-->
+		
 		<!-- JJWT for JWT token creation and validation -->
-		<!--
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
@@ -101,7 +100,6 @@
 			<version>0.12.5</version>
 			<scope>runtime</scope>
 		</dependency>
-		-->
 
 		
 
@@ -118,12 +116,26 @@
 		</dependency>
 		
 		<!-- Redis for session management and caching -->
-		<!--
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
-		-->
+		
+		<!-- 그래도 안전하게 명시 -->
+		<dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-annotations</artifactId>
+		</dependency>
+		<dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-core</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -154,41 +166,5 @@
 			</plugin>
 		</plugins>
 	</build>
-	<repositories>
-		<repository>
-			<id>spring-milestones</id>
-			<name>Spring Milestones</name>
-			<url>https://repo.spring.io/milestone</url>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>spring-snapshots</id>
-			<name>Spring Snapshots</name>
-			<url>https://repo.spring.io/snapshot</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-		</repository>
-	</repositories>
-	<pluginRepositories>
-		<pluginRepository>
-			<id>spring-milestones</id>
-			<name>Spring Milestones</name>
-			<url>https://repo.spring.io/milestone</url>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</pluginRepository>
-		<pluginRepository>
-			<id>spring-snapshots</id>
-			<name>Spring Snapshots</name>
-			<url>https://repo.spring.io/snapshot</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-		</pluginRepository>
-	</pluginRepositories>
 
 </project>

@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 import pathlib
 import tempfile
@@ -8,12 +9,13 @@ from services.transcriber import transcribe_file
 from services.chapterizer import make_chapters_hf  # ← 이 파일로 통일
 
 # (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
-try:
-    from services.chapterizer_remote import make_chapters as make_chapters_remote
-except Exception:
-    make_chapters_remote = None
+# try:
+#     from services.chapterizer_remote import make_chapters as make_chapters_remote
+# except Exception:
+#     make_chapters_remote = None
 
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:8181", "http://127.0.0.1:8181"])  # CORS 활성화 (Spring Boot에서의 요청 허용)
 cfg = Settings.from_env()
 
 @app.get("/health")
@@ -40,12 +42,14 @@ def analyze():
 
         # 1) Whisper
         try:
+            app.logger.info(f"Starting transcription for file: {in_path}")
             duration, segments, detected_lang = transcribe_file(
                 file_path=in_path,
                 language=lang_query,  # None이면 자동감지
                 whisper_model=cfg.WHISPER_MODEL,
                 use_fp16=cfg.WHISPER_FP16
             )
+            app.logger.info(f"Transcription completed. Duration: {duration}, Segments: {len(segments)}")
         except Exception as e:
             app.logger.exception("transcription failed: %s", e)
             return jsonify({"error": "transcription failed", "detail": str(e)}), 500
@@ -58,6 +62,7 @@ def analyze():
         chapters = []
         if segments:
             try:
+                app.logger.info(f"Starting chapterization with {len(segments)} segments")
                 provider = (cfg.LLM_PROVIDER or "hf_local").lower()
                 if provider == "hf_local":
                     chapters = make_chapters_hf(
@@ -77,6 +82,7 @@ def analyze():
                         low_cpu_mem=cfg.HF_LOW_CPU_MEM,
                         torch_dtype_name=cfg.HF_TORCH_DTYPE
                     )
+                    app.logger.info(f"Chapterization completed. Chapters: {len(chapters)}")
                 elif provider == "remote" and make_chapters_remote is not None:
                     chapters = make_chapters_remote(
                         segments=segments,

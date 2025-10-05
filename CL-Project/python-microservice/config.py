@@ -38,17 +38,17 @@ class Settings:
             WHISPER_MODEL=os.getenv("WHISPER_MODEL", "small"),
             WHISPER_FP16=os.getenv("WHISPER_FP16", "false").lower() in ("1","true","yes"),
 
-            LLM_PROVIDER=os.getenv("LLM_PROVIDER", "hf_local"),
+                    LLM_PROVIDER=os.getenv("LLM_PROVIDER", "hf_local"),
 
             LLM_BASE_URL=os.getenv("LLM_BASE_URL", "http://127.0.0.1:8000/v1"),
             LLM_MODEL=os.getenv("LLM_MODEL", "gpt-oss-20b"),
             LLM_API_KEY=os.getenv("LLM_API_KEY", ""),
 
-            HF_MODEL_ID=os.getenv("HF_MODEL_ID", "openai/gpt-oss-20b"),
+                    HF_MODEL_ID=os.getenv("HF_MODEL_ID", "meta-llama/Llama-3.2-3B-Instruct"),
             HF_LOAD_IN_4BIT=os.getenv("HF_LOAD_IN_4BIT", "true").lower() in ("1","true","yes"), # HF_LOAD_IN_4BIT false -> cpu
             HF_MAX_NEW_TOKENS=int(os.getenv("HF_MAX_NEW_TOKENS", "1024")),
             HF_TEMPERATURE=float(os.getenv("HF_TEMPERATURE", "0.2")),
-            HF_TOKEN=os.getenv("HF_TOKEN", ""),
+                    HF_TOKEN=os.getenv("HF_TOKEN", "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"),
 
             HF_MAX_GPU_MEMORY=os.getenv("HF_MAX_GPU_MEMORY", "12GiB"),
             HF_MAX_CPU_MEMORY=os.getenv("HF_MAX_CPU_MEMORY", "64GiB"),

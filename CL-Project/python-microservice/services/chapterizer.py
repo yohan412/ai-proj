@@ -68,9 +68,17 @@ def _get_pipe(
             token=(hf_token or None),
         )
 
+        # Llama-3.1-8B-Instruct 모델용 토크나이저 설정
         tok = AutoTokenizer.from_pretrained(
-            model_id, use_fast=True, trust_remote_code=True, token=(hf_token or None)
+            model_id, 
+            use_fast=True, 
+            trust_remote_code=True, 
+            token=(hf_token or None)
         )
+        
+        # Llama 모델용 패딩 토큰 설정
+        if tok.pad_token is None:
+            tok.pad_token = tok.eos_token
 
         # 4bit (GPU 권장) 우선 시도
         if load_in_4bit and torch.cuda.is_available():
@@ -89,7 +97,8 @@ def _get_pipe(
                     "text-generation",
                     model=mdl, tokenizer=tok,
                     temperature=temperature, max_new_tokens=max_new_tokens,
-                    do_sample=True, return_full_text=False
+                    do_sample=True, return_full_text=False,
+                    pad_token_id=tok.eos_token_id
                 )
                 _loaded_key = want
                 return _pipe
@@ -120,7 +129,8 @@ def _get_pipe(
             "text-generation",
             model=mdl, tokenizer=tok,
             temperature=temperature, max_new_tokens=max_new_tokens,
-            do_sample=True, return_full_text=False
+            do_sample=True, return_full_text=False,
+            pad_token_id=tok.eos_token_id
         )
         _loaded_key = want
         return _pipe
@@ -181,28 +191,30 @@ def make_chapters_hf(
     sys_lang = _lang_label_from_code(lang)
     transcript_block = _pack_segments_for_prompt(segments, duration, max_segments_for_prompt)
 
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Role: Professional video chapterizer.\n"
-                "Reasoning: medium\n"
-                "Task: Given a transcript (start|end|text per line), segment the video into 3–12 topic-based chapters.\n"
-                "Rules: no overlaps; chronological; concise titles; summaries 1–2 sentences; "
-                f"times in seconds (float). Use language: {sys_lang}.\n"
-                "Return STRICT JSON ONLY with schema:\n"
-                "{ \"chapters\": [ {\"start\": <float>, \"end\": <float>, \"title\": \"<string>\", \"summary\": \"<string>\"} ] }\n"
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Video duration (seconds): {round_time(duration)}\n"
-                "Transcript lines (start|end|text):\n"
-                f"{transcript_block}\n"
-            ),
-        },
-    ]
+    # Llama-3.1-8B-Instruct 모델용 프롬프트 형식
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a professional video chapterizer. Your task is to analyze a video transcript and create 3-12 topic-based chapters.
+
+Rules:
+- No overlapping time segments
+- Chronological order
+- Concise chapter titles
+- 1-2 sentence summaries
+- Times in seconds (float format)
+- Use language: {sys_lang}
+- Return STRICT JSON ONLY with this exact schema:
+{{"chapters": [{{"start": <float>, "end": <float>, "title": "<string>", "summary": "<string>"}}]}}
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Video duration (seconds): {round_time(duration)}
+Transcript lines (start|end|text):
+{transcript_block}
+
+Please analyze this transcript and create chapters as requested.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
 
     pipe = _get_pipe(
         model_id, load_in_4bit, temperature, max_new_tokens, hf_token,
@@ -212,7 +224,8 @@ def make_chapters_hf(
         low_cpu_mem=low_cpu_mem,
         torch_dtype_name=torch_dtype_name
     )
-    outputs = pipe(messages)
+    # Llama 모델용 단일 프롬프트 처리
+    outputs = pipe(prompt)
     text = _extract_text(outputs)
 
     obj = ensure_json(text) or {}

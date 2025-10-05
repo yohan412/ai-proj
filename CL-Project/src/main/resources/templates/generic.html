@@ -397,20 +397,38 @@
       if(card) card.classList.add('active');
     }
 
-    /* ===== 분석 호출(/api/analyze) ===== */
+    /* ===== 분석 호출(Flask /analyze) ===== */
     btnAnalyze.addEventListener('click', async ()=>{
       if(!currentVideoFile){ alert('좌측에서 먼저 영상 파일을 불러와 주세요.'); return; }
-      btnAnalyze.disabled = true; statusEl.textContent = '분석 중... (Whisper → GPT-OSS-20B)';
+      btnAnalyze.disabled = true; statusEl.textContent = '분석 중... (Whisper → Llama-3.1-8B-Instruct)';
       try{
         const fd = new FormData();
         fd.append('file', currentVideoFile);
-        const res = await fetch('/api/analyze?lang=ko', { method:'POST', body: fd });
-        if(!res.ok) throw new Error('서버 오류');
+        console.log('Sending request to Flask server...');
+        // Flask 서버로 직접 요청
+        const res = await fetch('http://localhost:5001/analyze?lang=ko', { 
+          method:'POST', 
+          body: fd,
+          mode: 'cors'
+        });
+        console.log('Response status:', res.status);
+        if(!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`서버 오류: ${res.status} - ${errorText}`);
+        }
         const data = await res.json(); // {duration, segments, chapters}
+        console.log('Received data:', data);
 
         resetTimeline();
 
         const chapters = Array.isArray(data.chapters) ? data.chapters : [];
+        console.log('Chapters received:', chapters);
+        
+        if(chapters.length === 0) {
+          statusEl.textContent = '경고: 생성된 챕터가 없습니다.';
+          return;
+        }
+        
         // 챕터 개수만큼 썸네일 박스 생성
         timeline.innerHTML = '';
         for(let i=0;i<chapters.length;i++){
@@ -421,14 +439,17 @@
         }
         ensureTrailingEmptyThumb(); // 끝에 빈 상자 하나
 
-        // 페어 생성 + 썸네일 라벨
+        // 페어 생성 + 썸네일 캡처 (각 챕터 시작 시점의 화면)
         const boxes = [...timeline.querySelectorAll('.timeline-item')].filter(el => el.dataset.filled === 'true');
         const pairIds = [];
         for(let i=0;i<chapters.length;i++){
-          const ch = chapters[i]; const box = boxes[i];
+          const ch = chapters[i]; 
+          const box = boxes[i];
           const id = createChapterPair(ch, box);
-          const p = pairs.get(id); if(p) p.meta.index = i;
+          const p = pairs.get(id); 
+          if(p) p.meta.index = i;
           pairIds.push(id);
+          // 챕터 시작 시점의 화면을 썸네일로 캡처
           await updateThumbFromTime(id, `${i+1}. ${ch.title||''}`);
         }
 
