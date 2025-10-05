@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cl-flask:cu124-cudnn9
+    container_name: video-chapterizer
+    restart: unless-stopped
+    # TensorDock는 GPU를 할당해줍니다. Compose에선 gpus: all 로 요청
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+              driver: nvidia
+              count: 1
+    # 최신 Compose는 간단히 gpus: all 도 지원됩니다(둘 중 하나 사용)
+    gpus: all
+
+    environment:
+      # Flask/LLM 설정(아래 .env.example 참고. 실제에선 .env 파일로 대체)
+      - LLM_PROVIDER=hf_local
+      - HF_MODEL_ID=openai/gpt-oss-20b
+      - HF_LOAD_IN_4BIT=true           # 리눅스 + CUDA면 true 권장
+      - HF_MAX_NEW_TOKENS=1300          # 12GB VRAM이면 512~768 권장
+      - HF_TEMPERATURE=0.2
+      - HF_MAX_GPU_MEMORY=20GiB        # 12GB GPU면 9~10GiB 권장(여유 남김)
+      - HF_MAX_CPU_MEMORY=64GiB
+      - HF_OFFLOAD_DIR=/offload
+      - HF_LOW_CPU_MEM=true
+      - HF_TORCH_DTYPE=auto
+      - WHISPER_MODEL=small
+      - WHISPER_FP16=true             # VRAM 아끼려면 false(Whisper는 CPU로)
+      - HF_TOKEN=${HF_TOKEN}           # 프라이빗/레이트리밋 우회 시 필요
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:64
+
+    volumes:
+      - ./offload:/offload
+      - ./cache:/cache
+      - ./models:/models
+      # 필요 시 업로드 임시폴더도 마운트 가능
+      # - ./uploads:/uploads
+
+    ports:
+      - "5001:5001"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+

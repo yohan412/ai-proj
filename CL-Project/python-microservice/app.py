@@ -6,7 +6,7 @@ import tempfile
 
 from config import Settings
 from services.transcriber import transcribe_file
-from services.chapterizer import make_chapters_hf  # ← 이 파일로 통일
+from services.chapterizer import make_chapters_hf  # ← 로컬 HF 경로 사용
 
 # (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
 # try:
@@ -32,7 +32,15 @@ def health():
 def analyze():
     lang_query = request.args.get("lang")
     f = request.files.get("file")
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    app.logger.info(
+        "POST /analyze from=%s lang=%s content_length=%s has_file=%s",
+        client_ip, lang_query, request.content_length, bool(f)
+    )
+
     if not f:
+        app.logger.warning("no file field in request")
         return jsonify({"error": "no file"}), 400
 
     with tempfile.TemporaryDirectory() as td:
@@ -56,7 +64,7 @@ def analyze():
 
         lang_for_chapter = (lang_query or detected_lang or "").lower()
 
-        print(segments)
+        # print(segments)  # ★ CHANGED: 과도한 출력은 주석 처리(로그 폭주/성능 저하 방지)
 
         # 2) Chapters
         chapters = []
@@ -70,7 +78,7 @@ def analyze():
                         duration=duration,
                         lang=lang_for_chapter,
                         model_id=cfg.HF_MODEL_ID,
-                        load_in_4bit=cfg.HF_LOAD_IN_4BIT,
+                        load_in_4bit=cfg.HF_LOAD_IN_4BIT,     # BitsAndBytesConfig 내부로만 반영됨 (경고 제거됨) ★ CHANGED
                         temperature=cfg.HF_TEMPERATURE,
                         max_new_tokens=cfg.HF_MAX_NEW_TOKENS,
                         max_segments_for_prompt=cfg.MAX_SEGMENTS_FOR_PROMPT,
@@ -80,7 +88,7 @@ def analyze():
                         max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
                         offload_dir=cfg.HF_OFFLOAD_DIR,
                         low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-                        torch_dtype_name=cfg.HF_TORCH_DTYPE
+                        torch_dtype_name=(cfg.HF_TORCH_DTYPE or "auto"),  # ★ CHANGED: 빈값 보호
                     )
                     app.logger.info(f"Chapterization completed. Chapters: {len(chapters)}")
                 elif provider == "remote" and make_chapters_remote is not None:
