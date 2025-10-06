@@ -6,17 +6,17 @@ waitress>=2.1.2,<3.0
 python-dotenv>=1.0.1,<2.0
 pydantic>=2.6,<3.0
 
-# ===== PyTorch (CPU only) =====
-# 주의: 아래 extra index가 있어야 CPU 전용 휠을 받습니다.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1+cpu
-torchvision==0.20.1+cpu
-torchaudio==2.5.1+cpu
+# ===== PyTorch (CUDA 11.8) =====
+# GPU 사용을 위한 CUDA 버전 PyTorch
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch==2.7.1+cu118
+torchvision==0.22.1+cu118
+torchaudio==2.7.1+cu118
 
 transformers==4.44.2
-accelerate==0.33.0
+accelerate==1.10.1
 bitsandbytes==0.44.1
-triton==2.3.1         # bnb가 triton 기반 모듈을 쓸 때 필요
+# triton>=2.0.0         # bnb가 triton 기반 모듈을 쓸 때 필요 (Windows에서 문제 발생 시 제외)
 
 # whisper 등 기타
 faster-whisper>=1.0.0

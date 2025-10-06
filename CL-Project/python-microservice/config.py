@@ -50,11 +50,11 @@ class Settings:
             HF_TEMPERATURE=float(os.getenv("HF_TEMPERATURE", "0.2")),
                     HF_TOKEN=os.getenv("HF_TOKEN", "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"),
 
-            HF_MAX_GPU_MEMORY=os.getenv("HF_MAX_GPU_MEMORY", "12GiB"),
-            HF_MAX_CPU_MEMORY=os.getenv("HF_MAX_CPU_MEMORY", "64GiB"),
+            HF_MAX_GPU_MEMORY=os.getenv("HF_MAX_GPU_MEMORY", "16GiB"),  # GPU 메모리 증가
+            HF_MAX_CPU_MEMORY=os.getenv("HF_MAX_CPU_MEMORY", "32GiB"),  # CPU 메모리 감소
             HF_OFFLOAD_DIR=os.getenv("HF_OFFLOAD_DIR", "./offload"),
-            HF_LOW_CPU_MEM=os.getenv("HF_LOW_CPU_MEM", "true").lower() in ("1","true","yes"),
-            HF_TORCH_DTYPE=os.getenv("HF_TORCH_DTYPE", "auto"),
+            HF_LOW_CPU_MEM=os.getenv("HF_LOW_CPU_MEM", "false").lower() in ("1","true","yes"),  # GPU 사용 시 false
+            HF_TORCH_DTYPE=os.getenv("HF_TORCH_DTYPE", "bfloat16"),  # GPU 최적화 dtype
 
             MAX_SEGMENTS_FOR_PROMPT=int(os.getenv("MAX_SEGMENTS_FOR_PROMPT", "1200")),
         )

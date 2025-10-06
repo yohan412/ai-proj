@@ -3,6 +3,21 @@ from flask_cors import CORS
 import os
 import pathlib
 import tempfile
+import sys
+import io
+
+# Windows 한글 인코딩 문제 해결
+if sys.platform == "win32":
+    # 콘솔 출력을 UTF-8로 설정
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # 환경변수 설정
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+# CUDA 라이브러리 경로 설정
+import nvidia.cublas
+cublas_bin_path = os.path.join(os.path.dirname(nvidia.cublas.__file__), 'bin')
+os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
 
 from config import Settings
 from services.transcriber import transcribe_file
@@ -15,7 +30,7 @@ from services.chapterizer import make_chapters_hf  # ← 로컬 HF 경로 사용
 #     make_chapters_remote = None
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:8181", "http://127.0.0.1:8181"])  # CORS 활성화 (Spring Boot에서의 요청 허용)
+CORS(app, origins=["http://localhost:8181", "http://127.0.0.1:8181", "http://localhost:8080", "http://127.0.0.1:8080"])  # CORS 활성화 (Spring Boot에서의 요청 허용)
 cfg = Settings.from_env()
 
 @app.get("/health")
@@ -38,6 +53,15 @@ def analyze():
         "POST /analyze from=%s lang=%s content_length=%s has_file=%s",
         client_ip, lang_query, request.content_length, bool(f)
     )
+    
+    # 디버깅을 위한 추가 로그
+    print(f"\n=== 분석 요청 시작 ===")
+    print(f"클라이언트 IP: {client_ip}")
+    print(f"언어: {lang_query}")
+    print(f"파일 존재: {bool(f)}")
+    print(f"파일명: {f.filename if f else 'None'}")
+    print(f"콘텐츠 길이: {request.content_length}")
+    print(f"========================\n")
 
     if not f:
         app.logger.warning("no file field in request")
@@ -47,6 +71,9 @@ def analyze():
         suffix = pathlib.Path(f.filename).suffix or ".mp4"
         in_path = os.path.join(td, "input" + suffix)
         f.save(in_path)
+        
+        # 파일 저장 후 즉시 닫기
+        f.close()
 
         # 1) Whisper
         try:
@@ -58,6 +85,19 @@ def analyze():
                 use_fp16=cfg.WHISPER_FP16
             )
             app.logger.info(f"Transcription completed. Duration: {duration}, Segments: {len(segments)}")
+            
+            # 터미널에 자막 추출 결과 출력
+            print(f"\n[자막 추출 완료]")
+            print(f"[영상 길이] {duration:.2f}초")
+            print(f"[자막 구간 수] {len(segments)}개")
+            print(f"[감지된 언어] {detected_lang}")
+            print(f"\n[자막 내용 - 처음 5개 구간]")
+            for i, seg in enumerate(segments[:5]):
+                print(f"  {i+1}. [{seg['start']:.2f}s - {seg['end']:.2f}s] {seg['text']}")
+            if len(segments) > 5:
+                print(f"  ... 외 {len(segments)-5}개 구간")
+            print()
+            
         except Exception as e:
             app.logger.exception("transcription failed: %s", e)
             return jsonify({"error": "transcription failed", "detail": str(e)}), 500
@@ -71,6 +111,7 @@ def analyze():
         if segments:
             try:
                 app.logger.info(f"Starting chapterization with {len(segments)} segments")
+                print(f"\n[챕터 분석 시작] (Llama-3.2-3B-Instruct 사용)")
                 provider = (cfg.LLM_PROVIDER or "hf_local").lower()
                 if provider == "hf_local":
                     chapters = make_chapters_hf(
@@ -91,6 +132,7 @@ def analyze():
                         torch_dtype_name=(cfg.HF_TORCH_DTYPE or "auto"),  # ★ CHANGED: 빈값 보호
                     )
                     app.logger.info(f"Chapterization completed. Chapters: {len(chapters)}")
+                    
                 elif provider == "remote" and make_chapters_remote is not None:
                     chapters = make_chapters_remote(
                         segments=segments,
@@ -103,9 +145,11 @@ def analyze():
                     )
                 else:
                     app.logger.warning("Unknown LLM_PROVIDER=%s; skip chapterization.", provider)
+                    print(f"[경고] 알 수 없는 LLM_PROVIDER: {provider}")
                     chapters = []
             except Exception as e:
                 app.logger.exception("chapterization failed: %s", e)
+                print(f"[오류] 챕터 분석 실패: {str(e)}")
                 chapters = []
 
         return jsonify({
@@ -117,4 +161,4 @@ def analyze():
         })
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    app.run(host="0.0.0.0", port=5001, debug=True)

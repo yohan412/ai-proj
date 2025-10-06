@@ -25,6 +25,11 @@
     .preview-area.dragover{ outline:2px dashed var(--accent); }
     .preview-area video, .preview-area img{ max-height:100%; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
     #video-input{ display:none; }
+    
+    /* X 버튼 스타일 */
+    .close-button{ position:absolute; top:10px; right:10px; width:30px; height:30px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:50%; cursor:pointer; font-size:16px; font-weight:bold; z-index:10; display:none; }
+    .close-button:hover{ background:rgba(255,0,0,0.8); }
+    .preview-area.has-chapter .close-button{ display:block; }
 
     /* ===== 타임라인 ===== */
     .timeline-container{ position:relative; background:var(--panel); padding:48px 20px 20px; border-top:1px solid var(--line); min-height:var(--min-timeline-h); }
@@ -63,12 +68,29 @@
     .btn[disabled]{ opacity:.6; cursor:not-allowed; }
     .status{ font-size:12px; color:#9fb3c8; margin-left:8px; }
     .chapters{ padding:12px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
-    .chapter-card{ background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px; display:grid; gap:6px; cursor:pointer; }
+    .chapter-card{ background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px; display:grid; gap:6px; cursor:pointer; position:relative; }
     .chapter-card:hover{ border-color:#637386; }
     .chapter-card.active{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; }
     .chapter-title{ font-weight:700; font-size:14px; }
     .chapter-time{ font-size:12px; color:#c9d6e3; }
     .chapter-summary{ font-size:13px; color:#e7f1ff; opacity:.95; }
+    
+    /* 구간 편집 컨트롤 */
+    .chapter-edit{ position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer; display:none; }
+    .chapter-card:hover .chapter-edit{ display:block; }
+    .chapter-edit:hover{ background:rgba(0,0,0,0.9); }
+    
+    /* 구간 편집 모달 */
+    .edit-modal{ position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:none; align-items:center; justify-content:center; }
+    .edit-modal.active{ display:flex; }
+    .edit-content{ background:var(--panel); padding:20px; border-radius:8px; min-width:400px; }
+    .edit-row{ display:flex; gap:10px; margin-bottom:10px; align-items:center; }
+    .edit-row label{ min-width:60px; font-size:12px; color:#c9d6e3; }
+    .edit-row input{ flex:1; padding:6px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); color:white; }
+    .edit-buttons{ display:flex; gap:10px; justify-content:flex-end; margin-top:15px; }
+    .edit-btn{ padding:8px 16px; border:none; border-radius:4px; cursor:pointer; font-size:12px; }
+    .edit-btn.save{ background:var(--accent); color:white; }
+    .edit-btn.cancel{ background:var(--line); color:white; }
     @media (max-width: 1100px){ .editor-shell{ grid-template-columns:1fr; height:auto; } .right-panel{ min-width:0; } }
   </style>
 </head>
@@ -82,6 +104,7 @@
       <div class="editor-inner">
         <div class="preview-area" id="preview-area" title="클릭 또는 드래그&드롭으로 영상 불러오기">
           <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
+          <button class="close-button" id="close-button" title="원본 영상으로 돌아가기">×</button>
         </div>
 
         <div class="timeline-container">
@@ -107,6 +130,33 @@
     </div>
   </div>
 
+  <!-- 구간 편집 모달 -->
+  <div class="edit-modal" id="edit-modal">
+    <div class="edit-content">
+      <h3 style="margin:0 0 15px 0; color:white;">구간 편집</h3>
+      <div class="edit-row">
+        <label>제목:</label>
+        <input type="text" id="edit-title" placeholder="챕터 제목">
+      </div>
+      <div class="edit-row">
+        <label>시작:</label>
+        <input type="number" id="edit-start" step="0.1" placeholder="시작 시간(초)">
+      </div>
+      <div class="edit-row">
+        <label>종료:</label>
+        <input type="number" id="edit-end" step="0.1" placeholder="종료 시간(초)">
+      </div>
+      <div class="edit-row">
+        <label>요약:</label>
+        <input type="text" id="edit-summary" placeholder="챕터 요약">
+      </div>
+      <div class="edit-buttons">
+        <button class="edit-btn save" id="save-edit">저장</button>
+        <button class="edit-btn cancel" id="cancel-edit">취소</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /* ===== 요소 참조 ===== */
     const fileInput = document.getElementById('video-input');
@@ -124,6 +174,8 @@
     // pair: 챕터와 연결된 구조 (시작/종료 마커 + 밴드 + 썸네일)
     const pairs = new Map(); // id -> { id, start, end, startMarker, endMarker, band, thumb, meta }
     let activeId = null;
+    let currentChapter = null; // 현재 재생 중인 챕터
+    let editingChapterId = null; // 편집 중인 챕터 ID
 
     /* ===== 업로드 / 로드 ===== */
     previewArea.addEventListener('click', (e)=>{ if(e.target.tagName.toLowerCase()!=='video') fileInput.click(); });
@@ -379,13 +431,24 @@
         sum.className = 'chapter-summary';
         sum.textContent = ch.summary || '';
 
-        card.appendChild(title); card.appendChild(tm); card.appendChild(sum);
+        // 편집 버튼 추가
+        const editBtn = document.createElement('button');
+        editBtn.className = 'chapter-edit';
+        editBtn.textContent = '편집';
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditModal(Number(card.dataset.pairId), ch);
+        });
+
+        card.appendChild(title); 
+        card.appendChild(tm); 
+        card.appendChild(sum);
+        card.appendChild(editBtn);
 
         card.addEventListener('click', ()=>{
           const pid = Number(card.dataset.pairId);
           setActive(pid);
-          const p = pairs.get(pid);
-          if(p && videoEl) videoEl.currentTime = p.start;
+          playChapter(pid);
         });
 
         chaptersWrap.appendChild(card);
@@ -405,8 +468,8 @@
         const fd = new FormData();
         fd.append('file', currentVideoFile);
         console.log('Sending request to Flask server...');
-        // Flask 서버로 직접 요청
-        const res = await fetch('http://localhost:5001/analyze?lang=ko', { 
+        // Spring Boot 서버를 통해 Flask로 요청
+        const res = await fetch('/api/analyze?lang=ko', { 
           method:'POST', 
           body: fd,
           mode: 'cors'
@@ -468,6 +531,117 @@
         alert('분석 중 오류가 발생했습니다.');
       }finally{
         btnAnalyze.disabled = false;
+      }
+    });
+
+    /* ===== 챕터 재생 기능 ===== */
+    function playChapter(pairId) {
+      const p = pairs.get(pairId);
+      if (!p || !videoEl) return;
+      
+      currentChapter = p;
+      previewArea.classList.add('has-chapter');
+      
+      // 챕터 구간으로 이동
+      videoEl.currentTime = p.start;
+      
+      // 챕터 종료 시 원본으로 돌아가기
+      const checkEnd = () => {
+        if (videoEl.currentTime >= p.end) {
+          videoEl.pause();
+          videoEl.removeEventListener('timeupdate', checkEnd);
+          returnToOriginal();
+        }
+      };
+      
+      videoEl.addEventListener('timeupdate', checkEnd);
+      videoEl.play();
+    }
+    
+    function returnToOriginal() {
+      currentChapter = null;
+      previewArea.classList.remove('has-chapter');
+      if (videoEl) {
+        videoEl.currentTime = 0;
+      }
+    }
+    
+    /* ===== 구간 편집 기능 ===== */
+    function openEditModal(pairId, chapter) {
+      editingChapterId = pairId;
+      const modal = document.getElementById('edit-modal');
+      const p = pairs.get(pairId);
+      
+      if (p) {
+        document.getElementById('edit-title').value = chapter.title || '';
+        document.getElementById('edit-start').value = p.start;
+        document.getElementById('edit-end').value = p.end;
+        document.getElementById('edit-summary').value = chapter.summary || '';
+        modal.classList.add('active');
+      }
+    }
+    
+    function saveChapterEdit() {
+      if (editingChapterId === null) return;
+      
+      const p = pairs.get(editingChapterId);
+      if (!p) return;
+      
+      const newTitle = document.getElementById('edit-title').value;
+      const newStart = parseFloat(document.getElementById('edit-start').value);
+      const newEnd = parseFloat(document.getElementById('edit-end').value);
+      const newSummary = document.getElementById('edit-summary').value;
+      
+      // 유효성 검사
+      if (newStart >= newEnd || newStart < 0 || newEnd > duration) {
+        alert('잘못된 시간 범위입니다.');
+        return;
+      }
+      
+      // 챕터 데이터 업데이트
+      p.start = newStart;
+      p.end = newEnd;
+      p.meta.chapter.title = newTitle;
+      p.meta.chapter.summary = newSummary;
+      
+      // UI 업데이트
+      positionPair(editingChapterId);
+      updateChapterCard(editingChapterId);
+      
+      // 모달 닫기
+      closeEditModal();
+    }
+    
+    function updateChapterCard(pairId) {
+      const p = pairs.get(pairId);
+      if (!p) return;
+      
+      const card = document.querySelector(`[data-pair-id="${pairId}"]`);
+      if (card) {
+        const title = card.querySelector('.chapter-title');
+        const time = card.querySelector('.chapter-time');
+        const summary = card.querySelector('.chapter-summary');
+        
+        if (title) title.textContent = `${(p.meta?.index ?? 0) + 1}. ${p.meta.chapter.title || '제목 없음'}`;
+        if (time) time.textContent = `${toSrtTime(p.start)} → ${toSrtTime(p.end)}`;
+        if (summary) summary.textContent = p.meta.chapter.summary || '';
+      }
+    }
+    
+    function closeEditModal() {
+      editingChapterId = null;
+      document.getElementById('edit-modal').classList.remove('active');
+    }
+    
+    /* ===== 이벤트 리스너 ===== */
+    document.getElementById('close-button').addEventListener('click', returnToOriginal);
+    document.getElementById('save-edit').addEventListener('click', saveChapterEdit);
+    document.getElementById('cancel-edit').addEventListener('click', closeEditModal);
+    
+    // 모달 외부 클릭 시 닫기
+    document.getElementById('edit-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'edit-modal') {
+        closeEditModal();
       }
     });
 
