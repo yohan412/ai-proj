@@ -78,25 +78,12 @@ def _get_pipe(
     if _pipe is not None and _loaded_key == want:
         return _pipe
 
-    with _lock:
-        if _pipe is not None and _loaded_key == want:
-            return _pipe
+    try:
+        with _lock:
+            if _pipe is not None and _loaded_key == want:
+                return _pipe
 
         dtype = _str2dtype(torch_dtype_name)
-
-        # ★ NEW: 레포의 mxfp4 설정(quantization_config 등)을 강제로 무시하도록 config 정리
-        hf_cfg = AutoConfig.from_pretrained(                 # ★ NEW
-            model_id, token=(hf_token or None), trust_remote_code=True
-        )
-        for attr in ("quantization_config", "quantization_method", "quantization", "quant_method"):  # ★ NEW
-            if hasattr(hf_cfg, attr):
-                try:
-                    delattr(hf_cfg, attr)                    # ★ NEW
-                except Exception:
-                    try:
-                        setattr(hf_cfg, attr, None)          # ★ NEW
-                    except Exception:
-                        pass
 
         # 디바이스/메모리 매핑
         if torch.cuda.is_available():
@@ -117,7 +104,6 @@ def _get_pipe(
             trust_remote_code=True,
             token=(hf_token or None),
             offload_folder=offload_dir,
-            config=hf_cfg,                                    # ★ NEW: 우리가 정리한 config를 강제 사용
         )
 
         # Llama-3.1-8B-Instruct 모델용 토크나이저 설정
@@ -139,14 +125,32 @@ def _get_pipe(
             try:
                 print(f"[chapterizer] 4bit 모델 로딩 시도...")
                 bnb_cfg = _make_bnb_config()
-                mdl = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    torch_dtype=torch.bfloat16,
-                    quantization_config=bnb_cfg,              # ★ CHANGED: 유일한 양자화 진입점
-                    **common_kw                               # ★ CHANGED: config=hf_cfg 포함
-                )
+                print(f"[chapterizer] BnB 설정 완료, 모델 다운로드 시작...")
+                print(f"[chapterizer] AutoModelForCausalLM.from_pretrained 호출 시작...")
+                print(f"[chapterizer] model_id: {model_id}")
+                print(f"[chapterizer] torch_dtype: torch.bfloat16")
+                print(f"[chapterizer] common_kw keys: {list(common_kw.keys())}")
+                
+                try:
+                    mdl = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        torch_dtype=torch.bfloat16,
+                        quantization_config=bnb_cfg,
+                        **common_kw
+                    )
+                    print(f"[chapterizer] AutoModelForCausalLM.from_pretrained 호출 완료!")
+                except Exception as load_error:
+                    print(f"[chapterizer] from_pretrained 내부 오류: {load_error}")
+                    import traceback
+                    traceback.print_exc()
+                    raise load_error
+                
                 print(f"[chapterizer] 4bit 모델 로딩 성공, 파이프라인 생성 중...")
                 print(f"[chapterizer] 4bit 파이프라인 생성 시작...")
+                
+                # 파이프라인 생성 전 토크나이저 검증
+                print(f"[chapterizer] 토크나이저 검증 - pad_token_id: {tok.pad_token_id}, eos_token_id: {tok.eos_token_id}")
+                
                 _pipe = pipeline(
                     "text-generation",
                     model=mdl, tokenizer=tok,
@@ -157,18 +161,20 @@ def _get_pipe(
                 print(f"[chapterizer] 4bit 파이프라인 생성 완료")
                 print(f"[chapterizer] 파이프라인 객체 타입: {type(_pipe)}")
                 _loaded_key = want
+                print(f"[chapterizer] 파이프라인 반환 준비 완료")
                 return _pipe
             except Exception as e:
                 print(f"[chapterizer] 4bit load failed -> fallback FP. reason={e}")
                 import traceback
                 traceback.print_exc()
+                mdl = None
 
         if mdl is None:
             print(f"[chapterizer] FP 모델 로딩 시도...")
             mdl = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=dtype,
-                **common_kw                                   # ★ CHANGED: FP 경로도 config=hf_cfg 사용
+                **common_kw
             )
             print(f"[chapterizer] FP 모델 로딩 성공, 파이프라인 생성 중...")
 
@@ -187,7 +193,13 @@ def _get_pipe(
         print(f"[chapterizer] FP 파이프라인 생성 완료")
         print(f"[chapterizer] 파이프라인 객체 타입: {type(_pipe)}")
         _loaded_key = want
+        print(f"[chapterizer] FP 파이프라인 반환 준비 완료")
         return _pipe
+    except Exception as global_error:
+        print(f"[chapterizer] _get_pipe 전체 오류 발생: {global_error}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def _pack_segments_for_prompt(segments: List[Dict[str, Any]], duration: float, max_segments: int) -> str:
     """세그먼트를 프롬프트로 압축."""
@@ -276,30 +288,38 @@ IMPORTANT RULES:
 - Each chapter should span multiple consecutive segments
 - Chapters must represent distinct subtopics or themes
 - Use chronological order
-- Concise, descriptive chapter titles (2-6 words)
-- 1-2 sentence summaries explaining the subtopic
+- Concise, descriptive chapter titles (2-6 words in ENGLISH)
+- 1-2 sentence summaries explaining the subtopic (in ENGLISH)
 - Times in seconds (float format)
-- Use language: {sys_lang}
-- Use ONLY ASCII characters in title and summary fields
-- NO Unicode characters, NO special symbols
+- Write ALL text in ENGLISH only (title and summary must be in English)
+- Use ONLY basic ASCII characters (a-z, A-Z, 0-9, space, punctuation)
+- NO Korean, NO Chinese, NO Japanese, NO Unicode symbols
 
 Return STRICT JSON ONLY with this exact schema:
 {{"chapters": [{{"start": <float>, "end": <float>, "title": "<string>", "summary": "<string>"}}]}}
+
+EXAMPLE OUTPUT:
+{{"chapters": [
+  {{"start": 0.0, "end": 120.5, "title": "Introduction to Elements", "summary": "Overview of what elements are and their basic properties."}},
+  {{"start": 120.5, "end": 305.2, "title": "Types of Elements", "summary": "Discussion of different types and classifications of elements."}}
+]}}
 
 DO NOT:
 - Create one chapter per segment
 - Include explanatory text before or after JSON
 - Use markdown code blocks
-- Use special Unicode characters or symbols
-- Use any non-ASCII characters
+- Use ANY non-English characters
+- Use Unicode escape sequences
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Video duration: {round_time(duration)} seconds
-Complete transcript:
+Complete transcript (in Korean):
 {transcript_block}
 
-Analyze the ENTIRE transcript and identify major subtopics. Create 4-8 chapters that group related segments by subtopic.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Analyze the ENTIRE transcript above and identify 4-8 major subtopics. Create chapters that group related segments by subtopic. 
+IMPORTANT: Write chapter titles and summaries in ENGLISH only, even though the transcript is in Korean.
+Return ONLY the JSON object, nothing else.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
 
@@ -331,14 +351,26 @@ Analyze the ENTIRE transcript and identify major subtopics. Create 4-8 chapters 
         
         try:
             print(f"[chapterizer] pipe(prompt) 호출 시작...")
+            import sys
+            sys.stdout.flush()  # 버퍼 강제 flush
+            
             outputs = pipe(prompt)
+            
             print(f"[chapterizer] pipe(prompt) 호출 완료!")
+            sys.stdout.flush()
             print(f"[chapterizer] 파이프 실행 완료, outputs 타입: {type(outputs)}")
-            print(f"[chapterizer] outputs 내용: {outputs}")
+            print(f"[chapterizer] outputs 길이: {len(outputs) if outputs else 0}")
+            sys.stdout.flush()
+            
+            if outputs and len(outputs) > 0:
+                print(f"[chapterizer] outputs[0] keys: {list(outputs[0].keys()) if isinstance(outputs[0], dict) else 'not dict'}")
+            print(f"[chapterizer] outputs 내용 (첫 200자): {str(outputs)[:200]}...")
+            sys.stdout.flush()
         except Exception as pipe_error:
             print(f"[chapterizer] pipe(prompt) 실행 중 오류: {pipe_error}")
             import traceback
             traceback.print_exc()
+            sys.stdout.flush()
             return []
         
     except Exception as e:
@@ -349,10 +381,15 @@ Analyze the ENTIRE transcript and identify major subtopics. Create 4-8 chapters 
     
     text = _extract_text(outputs)
     print(f"[chapterizer] 추론 완료, 응답 길이: {len(text)}자")
-    print(f"[chapterizer] 응답 내용: {text[:200]}...")
     
-    # 전체 응답 내용 확인
-    print(f"[chapterizer] 전체 응답: {text}")
+    # 전체 응답 내용 출력 (디버깅용)
+    print(f"\n{'='*80}")
+    print(f"[모델 생성 결과 - 전체]")
+    print(f"{'='*80}")
+    print(text)
+    print(f"{'='*80}\n")
+    
+    print(f"[chapterizer] 응답 내용 (첫 500자): {text[:500]}...")
 
     # JSON 파싱 개선 - Unicode 이스케이프 시퀀스 문제 해결
     print(f"[chapterizer] JSON 추출 시작...")

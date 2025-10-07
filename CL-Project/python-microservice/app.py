@@ -1,10 +1,12 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import pathlib
 import tempfile
 import sys
 import io
+import subprocess
+import hashlib
 
 # Windows 한글 인코딩 문제 해결
 if sys.platform == "win32":
@@ -159,6 +161,85 @@ def analyze():
             "chapters": chapters,
             "detected_lang": detected_lang
         })
+
+@app.post("/clip")
+def clip_video():
+    """영상 구간 자르기 API"""
+    try:
+        video_file = request.files.get("file")
+        start_time = float(request.form.get("start", 0))
+        end_time = float(request.form.get("end", 10))
+        
+        if not video_file:
+            return jsonify({"error": "no file"}), 400
+        
+        # FFmpeg 경로 확인 (프로젝트 루트의 AudioModel 폴더)
+        # 현재 파일: CL-Project/python-microservice/app.py
+        # AudioModel: ai-proj/AudioModel
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # python-microservice
+        project_root = os.path.dirname(os.path.dirname(current_dir))  # ai-proj
+        ffmpeg_path = os.path.join(project_root, "AudioModel", "ffmpeg.exe")
+        
+        print(f"[영상 자르기] FFmpeg 경로: {ffmpeg_path}")
+        print(f"[영상 자르기] FFmpeg 존재 여부: {os.path.exists(ffmpeg_path)}")
+        
+        if not os.path.exists(ffmpeg_path):
+            return jsonify({"error": f"ffmpeg not found at {ffmpeg_path}"}), 500
+        
+        with tempfile.TemporaryDirectory() as td:
+            # 입력 파일 저장
+            suffix = pathlib.Path(video_file.filename).suffix or ".mp4"
+            input_path = os.path.join(td, "input" + suffix)
+            output_path = os.path.join(td, "output.mp4")
+            
+            video_file.save(input_path)
+            video_file.close()
+            
+            # FFmpeg로 구간 자르기
+            duration = end_time - start_time
+            cmd = [
+                ffmpeg_path,
+                "-ss", str(start_time),
+                "-i", input_path,
+                "-t", str(duration),
+                "-c", "copy",  # 재인코딩 없이 빠른 복사
+                "-avoid_negative_ts", "make_zero",
+                "-y",  # 덮어쓰기
+                output_path
+            ]
+            
+            print(f"\n[영상 자르기] {start_time}s ~ {end_time}s")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"[오류] FFmpeg 실행 실패: {result.stderr}")
+                return jsonify({"error": "ffmpeg failed", "detail": result.stderr}), 500
+            
+            print(f"[완료] 구간 영상 생성: {output_path}")
+            
+            # 파일을 메모리로 읽어서 전송 (파일 핸들 문제 해결)
+            try:
+                with open(output_path, 'rb') as f:
+                    video_data = f.read()
+                
+                from flask import Response
+                return Response(
+                    video_data,
+                    mimetype='video/mp4',
+                    headers={
+                        'Content-Disposition': f'inline; filename="clip_{start_time}_{end_time}.mp4"',
+                        'Content-Length': str(len(video_data))
+                    }
+                )
+            except Exception as read_error:
+                print(f"[오류] 파일 읽기 실패: {read_error}")
+                return jsonify({"error": "file read failed", "detail": str(read_error)}), 500
+            
+    except Exception as e:
+        print(f"[오류] 영상 자르기 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)

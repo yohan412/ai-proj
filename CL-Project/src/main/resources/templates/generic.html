@@ -24,11 +24,16 @@
     .preview-area{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:var(--panel-2); cursor:pointer; min-height:var(--min-preview-h); }
     .preview-area.dragover{ outline:2px dashed var(--accent); }
     .preview-area video, .preview-area img{ max-height:100%; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+    .preview-area.has-chapter{ border:3px solid var(--accent); box-shadow:0 0 20px rgba(31,144,255,0.5); }
     #video-input{ display:none; }
     
+    /* 구간 재생 중 오버레이 */
+    .chapter-overlay{ position:absolute; bottom:15px; left:15px; background:rgba(0,0,0,0.85); color:white; padding:10px 15px; border-radius:6px; font-size:13px; z-index:50; display:none; border-left:4px solid var(--accent); }
+    .preview-area.has-chapter .chapter-overlay{ display:block; }
+    
     /* X 버튼 스타일 */
-    .close-button{ position:absolute; top:10px; right:10px; width:30px; height:30px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:50%; cursor:pointer; font-size:16px; font-weight:bold; z-index:10; display:none; }
-    .close-button:hover{ background:rgba(255,0,0,0.8); }
+    .close-button{ position:absolute; top:15px; right:15px; width:36px; height:36px; background:rgba(0,0,0,0.75); color:white; border:2px solid rgba(255,255,255,0.3); border-radius:50%; cursor:pointer; font-size:20px; font-weight:bold; z-index:100; display:none; transition:all 0.2s; line-height:32px; text-align:center; }
+    .close-button:hover{ background:rgba(255,77,77,0.9); border-color:rgba(255,255,255,0.6); transform:scale(1.1); }
     .preview-area.has-chapter .close-button{ display:block; }
 
     /* ===== 타임라인 ===== */
@@ -103,7 +108,13 @@
       <!-- ===== 왼쪽: 프리뷰 + 타임라인 ===== -->
       <div class="editor-inner">
         <div class="preview-area" id="preview-area" title="클릭 또는 드래그&드롭으로 영상 불러오기">
-          <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
+          <div id="video-wrapper" style="position:relative; max-width:100%; max-height:100%; display:flex; align-items:center; justify-content:center;">
+            <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
+          </div>
+          <div class="chapter-overlay" id="chapter-overlay">
+            <div style="font-weight:bold; margin-bottom:4px;">🎬 구간 재생 중</div>
+            <div id="overlay-info" style="font-size:12px; opacity:0.9;"></div>
+          </div>
           <button class="close-button" id="close-button" title="원본 영상으로 돌아가기">×</button>
         </div>
 
@@ -157,7 +168,37 @@
     </div>
   </div>
 
+  <!-- 새 구간 생성 모달 -->
+  <div class="edit-modal" id="create-modal">
+    <div class="edit-content">
+      <h3 style="margin:0 0 15px 0; color:white;">새 구간 생성</h3>
+      <div class="edit-row">
+        <label>제목:</label>
+        <input type="text" id="create-title" placeholder="챕터 제목">
+      </div>
+      <div class="edit-row">
+        <label>시작:</label>
+        <input type="number" id="create-start" step="0.1" placeholder="시작 시간(초)">
+      </div>
+      <div class="edit-row">
+        <label>종료:</label>
+        <input type="number" id="create-end" step="0.1" placeholder="종료 시간(초)">
+      </div>
+      <div class="edit-row">
+        <label>요약:</label>
+        <input type="text" id="create-summary" placeholder="챕터 요약">
+      </div>
+      <div class="edit-buttons">
+        <button class="edit-btn save" id="save-create">생성</button>
+        <button class="edit-btn cancel" id="cancel-create">취소</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // 즉시 실행 테스트
+    console.log('🚀 스크립트 시작!');
+    
     /* ===== 요소 참조 ===== */
     const fileInput = document.getElementById('video-input');
     const previewArea = document.getElementById('preview-area');
@@ -176,6 +217,8 @@
     let activeId = null;
     let currentChapter = null; // 현재 재생 중인 챕터
     let editingChapterId = null; // 편집 중인 챕터 ID
+    
+    console.log('🔧 변수 초기화 완료');
 
     /* ===== 업로드 / 로드 ===== */
     previewArea.addEventListener('click', (e)=>{ if(e.target.tagName.toLowerCase()!=='video') fileInput.click(); });
@@ -194,13 +237,17 @@
     function loadVideo(file){
       currentVideoFile = file;
       const url = URL.createObjectURL(file);
-      previewArea.innerHTML = '';
+      
+      // 비디오 wrapper 내부만 업데이트
+      const videoWrapper = document.getElementById('video-wrapper');
+      videoWrapper.innerHTML = '';
+      
       videoEl = document.createElement('video');
       videoEl.src = url; videoEl.controls = true;
       videoEl.style.maxHeight = '100%';
       videoEl.style.maxWidth  = '100%';
       videoEl.style.objectFit = 'contain';
-      previewArea.appendChild(videoEl);
+      videoWrapper.appendChild(videoEl);
 
       videoEl.addEventListener('loadedmetadata', ()=>{
         duration = videoEl.duration || 0;
@@ -238,6 +285,33 @@
       const start = clamp(chapter.start, 0, duration);
       const end   = clamp(chapter.end,   0, duration);
 
+      // 썸네일만 설정 (마커는 나중에 생성)
+      thumbEl.dataset.id = String(id);
+      thumbEl.dataset.filled = 'true';
+      thumbEl.classList.remove('empty');
+
+      // 상태 저장 (마커는 null로 초기화)
+      const meta = { chapter };
+      pairs.set(id, { 
+        id, start, end, 
+        startMarker: null, 
+        endMarker: null, 
+        band: null, 
+        thumb: thumbEl, 
+        meta,
+        markersCreated: false  // 마커 생성 여부 플래그
+      });
+
+      return id;
+    }
+
+    /* ===== 마커 생성 (썸네일 클릭 시에만) ===== */
+    function createMarkersForPair(id) {
+      const p = pairs.get(id);
+      if (!p || p.markersCreated) return; // 이미 생성된 경우 스킵
+
+      console.log(`마커 생성: pairId=${id}`);
+
       // 밴드
       const band = document.createElement('div');
       band.className = 'range-band';
@@ -257,30 +331,27 @@
       segmentBar.appendChild(mStart);
       segmentBar.appendChild(mEnd);
 
-      // 썸네일
-      thumbEl.dataset.id = String(id);
-      thumbEl.dataset.filled = 'true';
-      thumbEl.classList.remove('empty');
-
-      // 상태 저장
-      const meta = { chapter };
-      pairs.set(id, { id, start, end, startMarker:mStart, endMarker:mEnd, band, thumb:thumbEl, meta });
+      // 페어에 마커 정보 업데이트
+      p.startMarker = mStart;
+      p.endMarker = mEnd;
+      p.band = band;
+      p.markersCreated = true;
 
       positionPair(id);
       enableMarkerDrag(mStart);
       enableMarkerDrag(mEnd);
 
-      // 활성화/클릭
+      // 활성화/클릭 이벤트
       [mStart, mEnd, band].forEach(el=>{
         el.addEventListener('mousedown', ()=> setActive(id));
         el.addEventListener('click', (e)=>{ e.stopPropagation(); setActive(id); });
       });
-
-      return id;
     }
 
     function positionPair(id){
-      const p = pairs.get(id); if(!p) return;
+      const p = pairs.get(id); 
+      if(!p || !p.markersCreated) return; // 마커가 생성되지 않은 경우 스킵
+      
       const leftS = timeToLeft(p.start);
       const leftE = timeToLeft(p.end);
       const l = Math.min(leftS, leftE), r = Math.max(leftS, leftE);
@@ -298,9 +369,12 @@
       const p = pairs.get(id);
       if(p){
         p.thumb.classList.add('active');
-        p.startMarker.classList.add('active');
-        p.endMarker.classList.add('active');
-        p.band.classList.add('active');
+        // 마커가 생성된 경우에만 활성화
+        if(p.markersCreated) {
+          p.startMarker.classList.add('active');
+          p.endMarker.classList.add('active');
+          p.band.classList.add('active');
+        }
       }
       highlightChapterCardById(id);
     }
@@ -350,15 +424,73 @@
       }
     }
 
-    // 썸네일 클릭 → 해당 챕터로 이동
+    // 세그먼트 바 클릭 → 영상 시점 이동
+    segmentBar.addEventListener('click', e => {
+      if (!videoEl || !duration) return;
+      
+      const rect = segmentBar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickTime = (clickX / rect.width) * duration;
+      
+      console.log(`세그먼트 바 클릭: ${clickTime.toFixed(2)}초로 이동`);
+      
+      // 구간 영상 재생 중인 경우
+      if (currentChapter && currentChapter.clipVideo) {
+        const clipVideo = currentChapter.clipVideo;
+        const chapterStart = currentChapter.start;
+        const chapterEnd = currentChapter.end;
+        const chapterDuration = chapterEnd - chapterStart;
+        
+        // 클릭한 시점이 현재 챕터 범위 내에 있는지 확인
+        if (clickTime >= chapterStart && clickTime <= chapterEnd) {
+          // 챕터 내 상대적 시간으로 변환
+          const relativeTime = clickTime - chapterStart;
+          clipVideo.currentTime = Math.max(0, Math.min(chapterDuration, relativeTime));
+          console.log(`구간 영상 시점 이동: ${relativeTime.toFixed(2)}초 (전체 ${clickTime.toFixed(2)}초)`);
+        } else {
+          console.log(`클릭한 시점(${clickTime.toFixed(2)}초)이 현재 챕터 범위(${chapterStart.toFixed(2)}s-${chapterEnd.toFixed(2)}s)를 벗어남`);
+        }
+      } else {
+        // 원본 영상 재생 중인 경우
+        videoEl.currentTime = Math.max(0, Math.min(duration, clickTime));
+        console.log(`원본 영상 시점 이동: ${clickTime.toFixed(2)}초`);
+      }
+    });
+
+    // 썸네일 클릭 → 해당 챕터 구간만 재생 또는 새 구간 생성
     timeline.addEventListener('click', e=>{
       const item = e.target.closest('.timeline-item');
       if(!item) return;
+      
+      // 빈 타임라인 아이템 클릭 → 새 구간 생성 모달
+      if(item.dataset.filled === 'false') {
+        console.log('빈 타임라인 아이템 클릭 - 새 구간 생성 모달 열기');
+        openCreateModal();
+        return;
+      }
+      
       const id = Number(item.dataset.id || 0);
+      console.log(`타임라인 아이템 클릭: id=${id}, filled=${item.dataset.filled}`);
+      
       if(id && pairs.has(id)){
+        // 이전에 생성된 모든 마커 제거
+        [...segmentBar.querySelectorAll('.marker, .range-band')].forEach(el => el.remove());
+        console.log('이전 마커들 제거 완료');
+        
+        // 모든 페어의 마커 생성 상태 초기화
+        pairs.forEach((pair, pairId) => {
+          if (pairId !== id) {
+            pair.markersCreated = false;
+            pair.startMarker = null;
+            pair.endMarker = null;
+            pair.band = null;
+          }
+        });
+        
+        // 마커가 아직 생성되지 않은 경우 생성
+        createMarkersForPair(id);
         setActive(id);
-        const p = pairs.get(id);
-        if(videoEl) videoEl.currentTime = p.start;
+        playChapter(id);
       }
     });
 
@@ -534,36 +666,139 @@
       }
     });
 
-    /* ===== 챕터 재생 기능 ===== */
-    function playChapter(pairId) {
+    /* ===== 챕터 재생 기능 (구간별 영상 생성) ===== */
+    async function playChapter(pairId) {
+      console.log(`playChapter 호출: pairId=${pairId}`);
+      
       const p = pairs.get(pairId);
-      if (!p || !videoEl) return;
+      if (!p) {
+        console.error(`챕터 정보를 찾을 수 없음: pairId=${pairId}`);
+        return;
+      }
+      if (!currentVideoFile) {
+        console.error('원본 영상 파일이 없습니다.');
+        return;
+      }
       
-      currentChapter = p;
-      previewArea.classList.add('has-chapter');
+      console.log(`챕터 정보: start=${p.start}, end=${p.end}, title=${p.meta?.chapter?.title}`);
       
-      // 챕터 구간으로 이동
-      videoEl.currentTime = p.start;
+      const title = p.meta?.chapter?.title || `챕터 ${(p.meta?.index ?? 0) + 1}`;
       
-      // 챕터 종료 시 원본으로 돌아가기
-      const checkEnd = () => {
-        if (videoEl.currentTime >= p.end) {
-          videoEl.pause();
-          videoEl.removeEventListener('timeupdate', checkEnd);
-          returnToOriginal();
+      try {
+        // 구간 영상 생성 중 표시
+        statusEl.textContent = `구간 영상 생성 중... (${p.start.toFixed(1)}s ~ ${p.end.toFixed(1)}s)`;
+        
+        // Flask로 구간 영상 요청
+        const fd = new FormData();
+        fd.append('file', currentVideoFile);
+        fd.append('start', p.start);
+        fd.append('end', p.end);
+        
+        console.log(`Flask에 구간 영상 요청: start=${p.start}, end=${p.end}`);
+        
+        const res = await fetch('http://localhost:5001/clip', {
+          method: 'POST',
+          body: fd
+        });
+        
+        console.log(`Flask 응답 상태: ${res.status}`);
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error(`Flask 오류 응답: ${errorText}`);
+          throw new Error(`구간 영상 생성 실패: ${res.status} - ${errorText}`);
         }
-      };
-      
-      videoEl.addEventListener('timeupdate', checkEnd);
-      videoEl.play();
+        
+        // 구간 영상 Blob 받기
+        const blob = await res.blob();
+        const clipUrl = URL.createObjectURL(blob);
+        console.log('구간 영상 URL 생성 완료');
+        
+        // 비디오 wrapper에 구간 영상 표시
+        const videoWrapper = document.getElementById('video-wrapper');
+        videoWrapper.innerHTML = '';
+        
+        const clipVideo = document.createElement('video');
+        clipVideo.src = clipUrl;
+        clipVideo.controls = true;
+        clipVideo.style.maxHeight = '100%';
+        clipVideo.style.maxWidth = '100%';
+        clipVideo.style.objectFit = 'contain';
+        clipVideo.autoplay = true;
+        clipVideo.loop = true;  // 구간 영상 반복 재생
+        videoWrapper.appendChild(clipVideo);
+        
+        // 현재 챕터 정보 저장
+        currentChapter = { ...p, clipUrl, clipVideo };
+        previewArea.classList.add('has-chapter');
+        console.log('X 버튼 표시 활성화');
+        
+        // 오버레이 정보 업데이트
+        const overlayInfo = document.getElementById('overlay-info');
+        if (overlayInfo) {
+          overlayInfo.innerHTML = `
+            <div style="margin-bottom:2px;"><strong>${title}</strong></div>
+            <div style="opacity:0.8;">${p.start.toFixed(1)}s ~ ${p.end.toFixed(1)}s (${(p.end - p.start).toFixed(1)}초)</div>
+          `;
+        }
+        
+        statusEl.textContent = `구간 재생: ${title}`;
+        console.log('구간 영상 재생 시작');
+        
+      } catch (err) {
+        console.error('구간 영상 생성 실패:', err);
+        statusEl.textContent = '구간 영상 생성 실패';
+        alert('구간 영상 생성 중 오류가 발생했습니다: ' + err.message);
+      }
     }
     
     function returnToOriginal() {
+      console.log('returnToOriginal 호출');
+      
+      // 구간 영상 URL 해제
+      if (currentChapter && currentChapter.clipUrl) {
+        URL.revokeObjectURL(currentChapter.clipUrl);
+        console.log('구간 영상 URL 해제');
+      }
+      
       currentChapter = null;
       previewArea.classList.remove('has-chapter');
-      if (videoEl) {
-        videoEl.currentTime = 0;
+      console.log('X 버튼 숨김 (has-chapter 클래스 제거)');
+      
+      // 모든 마커 제거
+      [...segmentBar.querySelectorAll('.marker, .range-band')].forEach(el => el.remove());
+      console.log('모든 마커 제거 완료');
+      
+      // 원본 영상 다시 로드
+      if (currentVideoFile) {
+        const videoWrapper = document.getElementById('video-wrapper');
+        videoWrapper.innerHTML = '';
+        
+        const url = URL.createObjectURL(currentVideoFile);
+        videoEl = document.createElement('video');
+        videoEl.src = url;
+        videoEl.controls = true;
+        videoEl.style.maxHeight = '100%';
+        videoEl.style.maxWidth = '100%';
+        videoEl.style.objectFit = 'contain';
+        videoWrapper.appendChild(videoEl);
+        
+        videoEl.addEventListener('loadedmetadata', () => {
+          duration = videoEl.duration || 0;
+          console.log('원본 영상 다시 로드 완료');
+        }, { once: true });
       }
+      
+      // 모든 챕터 활성화 해제
+      document.querySelectorAll('.timeline-item').forEach(el=> el.classList.remove('active'));
+      document.querySelectorAll('.marker').forEach(el=> el.classList.remove('active'));
+      document.querySelectorAll('.range-band').forEach(el=> el.classList.remove('active'));
+      document.querySelectorAll('.chapter-card').forEach(el=> el.classList.remove('active'));
+      activeId = null;
+      console.log('모든 활성화 상태 해제');
+      
+      statusEl.textContent = '원본 영상 - 챕터를 선택하세요.';
+      console.log('원본 영상으로 복귀 완료');
     }
     
     /* ===== 구간 편집 기능 ===== */
@@ -579,6 +814,107 @@
         document.getElementById('edit-summary').value = chapter.summary || '';
         modal.classList.add('active');
       }
+    }
+    
+    /* ===== 새 구간 생성 기능 ===== */
+    function openCreateModal() {
+      if (!videoEl || !duration) {
+        alert('먼저 영상을 로드해주세요.');
+        return;
+      }
+      
+      const modal = document.getElementById('create-modal');
+      
+      // 현재 영상 시간을 기본값으로 설정
+      const currentTime = videoEl.currentTime || 0;
+      document.getElementById('create-title').value = '';
+      document.getElementById('create-start').value = currentTime.toFixed(1);
+      document.getElementById('create-end').value = Math.min(currentTime + 30, duration).toFixed(1);
+      document.getElementById('create-summary').value = '';
+      
+      modal.classList.add('active');
+    }
+    
+    function saveNewChapter() {
+      const title = document.getElementById('create-title').value.trim();
+      const start = parseFloat(document.getElementById('create-start').value);
+      const end = parseFloat(document.getElementById('create-end').value);
+      const summary = document.getElementById('create-summary').value.trim();
+      
+      // 유효성 검사
+      if (!title) {
+        alert('제목을 입력해주세요.');
+        return;
+      }
+      
+      if (isNaN(start) || isNaN(end) || start >= end || start < 0 || end > duration) {
+        alert('올바른 시간 범위를 입력해주세요.');
+        return;
+      }
+      
+      // 새 챕터 객체 생성
+      const newChapter = {
+        title: title,
+        start: start,
+        end: end,
+        summary: summary
+      };
+      
+      // 빈 타임라인 아이템을 찾아서 교체
+      const emptyItem = timeline.querySelector('.timeline-item.empty');
+      if (!emptyItem) {
+        alert('더 이상 구간을 추가할 수 없습니다.');
+        return;
+      }
+      
+      // 빈 아이템을 채워진 아이템으로 변경
+      emptyItem.classList.remove('empty');
+      emptyItem.dataset.filled = 'true';
+      
+      // 새 페어 생성
+      const id = createChapterPair(newChapter, emptyItem);
+      const p = pairs.get(id);
+      if (p) {
+        p.meta.index = pairs.size - 1; // 인덱스 설정
+      }
+      
+      // 썸네일 캡처
+      updateThumbFromTime(id, `${pairs.size}. ${title}`);
+      
+      // 새 빈 아이템 추가
+      ensureTrailingEmptyThumb();
+      
+      // 우측 챕터 카드 업데이트
+      updateChaptersList();
+      
+      // 모달 닫기
+      closeCreateModal();
+      
+      console.log(`새 구간 생성 완료: ${title} (${start}s - ${end}s)`);
+    }
+    
+    function closeCreateModal() {
+      document.getElementById('create-modal').classList.remove('active');
+    }
+    
+    function updateChaptersList() {
+      // 모든 챕터 정보 수집
+      const chapters = [];
+      const pairIds = [];
+      
+      pairs.forEach((pair, id) => {
+        if (pair.meta && pair.meta.chapter) {
+          chapters.push(pair.meta.chapter);
+          pairIds.push(id);
+        }
+      });
+      
+      // 인덱스 순으로 정렬
+      const sortedChapters = chapters.map((ch, idx) => ({ ...ch, originalIndex: idx }));
+      sortedChapters.sort((a, b) => a.start - b.start);
+      
+      // 챕터 카드 렌더링
+      renderChaptersList(sortedChapters, pairIds);
     }
     
     function saveChapterEdit() {
@@ -634,9 +970,20 @@
     }
     
     /* ===== 이벤트 리스너 ===== */
-    document.getElementById('close-button').addEventListener('click', returnToOriginal);
+    // X 버튼 클릭 이벤트
+    document.getElementById('close-button').addEventListener('click', (e) => {
+      e.stopPropagation();  // 부모 요소로 이벤트 전파 방지
+      console.log('X 버튼 클릭됨');
+      returnToOriginal();
+    });
+    
+    // 편집 모달 이벤트
     document.getElementById('save-edit').addEventListener('click', saveChapterEdit);
     document.getElementById('cancel-edit').addEventListener('click', closeEditModal);
+    
+    // 새 구간 생성 모달 이벤트
+    document.getElementById('save-create').addEventListener('click', saveNewChapter);
+    document.getElementById('cancel-create').addEventListener('click', closeCreateModal);
     
     // 모달 외부 클릭 시 닫기
     document.getElementById('edit-modal').addEventListener('click', (e) => {
@@ -644,9 +991,24 @@
         closeEditModal();
       }
     });
+    
+    document.getElementById('create-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'create-modal') {
+        closeCreateModal();
+      }
+    });
 
     /* ===== 보조 유틸 ===== */
     function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+    
+    /* ===== 초기화 ===== */
+    console.log('✅ 페이지 스크립트 로드 완료');
+    console.log('✅ 타임라인 이벤트 리스너 등록됨');
+    console.log('✅ X 버튼 이벤트 리스너 등록됨');
+    console.log('현재 설정:');
+    console.log('  - videoEl:', videoEl);
+    console.log('  - duration:', duration);
+    console.log('  - currentVideoFile:', currentVideoFile);
   </script>
 </body>
 </html>
