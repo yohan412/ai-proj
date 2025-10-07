@@ -154,6 +154,29 @@ def analyze():
                 print(f"[오류] 챕터 분석 실패: {str(e)}")
                 chapters = []
 
+        # 3) 10초 미만의 짧은 챕터 필터링
+        if chapters:
+            original_count = len(chapters)
+            MIN_CHAPTER_DURATION = 10.0  # 최소 챕터 길이 (초)
+            
+            filtered_chapters = []
+            for ch in chapters:
+                chapter_duration = ch.get('end', 0) - ch.get('start', 0)
+                if chapter_duration >= MIN_CHAPTER_DURATION:
+                    filtered_chapters.append(ch)
+                else:
+                    print(f"[필터링] 짧은 챕터 제거: '{ch.get('title', 'Unknown')}' ({chapter_duration:.1f}초)")
+            
+            chapters = filtered_chapters
+            filtered_count = original_count - len(chapters)
+            
+            if filtered_count > 0:
+                print(f"\n[챕터 필터링 완료]")
+                print(f"  - 원본 챕터 수: {original_count}개")
+                print(f"  - 제거된 챕터: {filtered_count}개 (10초 미만)")
+                print(f"  - 최종 챕터 수: {len(chapters)}개\n")
+                app.logger.info(f"Filtered out {filtered_count} chapters shorter than {MIN_CHAPTER_DURATION}s")
+
         return jsonify({
             "format": "json",
             "duration": duration,

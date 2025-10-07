@@ -46,7 +46,7 @@ class Settings:
 
                     HF_MODEL_ID=os.getenv("HF_MODEL_ID", "meta-llama/Llama-3.2-3B-Instruct"),
             HF_LOAD_IN_4BIT=os.getenv("HF_LOAD_IN_4BIT", "true").lower() in ("1","true","yes"), # HF_LOAD_IN_4BIT false -> cpu
-            HF_MAX_NEW_TOKENS=int(os.getenv("HF_MAX_NEW_TOKENS", "1024")),
+            HF_MAX_NEW_TOKENS=int(os.getenv("HF_MAX_NEW_TOKENS", "2048")),
             HF_TEMPERATURE=float(os.getenv("HF_TEMPERATURE", "0.2")),
                     HF_TOKEN=os.getenv("HF_TOKEN", "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"),
 

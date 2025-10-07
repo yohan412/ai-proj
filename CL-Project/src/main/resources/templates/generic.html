@@ -579,6 +579,23 @@
 
         card.addEventListener('click', ()=>{
           const pid = Number(card.dataset.pairId);
+          
+          // 이전에 생성된 모든 마커 제거
+          [...segmentBar.querySelectorAll('.marker, .range-band')].forEach(el => el.remove());
+          console.log('chapter-card 클릭: 이전 마커들 제거 완료');
+          
+          // 모든 페어의 마커 생성 상태 초기화
+          pairs.forEach((pair, pairId) => {
+            if (pairId !== pid) {
+              pair.markersCreated = false;
+              pair.startMarker = null;
+              pair.endMarker = null;
+              pair.band = null;
+            }
+          });
+          
+          // 마커가 아직 생성되지 않은 경우 생성
+          createMarkersForPair(pid);
           setActive(pid);
           playChapter(pid);
         });
