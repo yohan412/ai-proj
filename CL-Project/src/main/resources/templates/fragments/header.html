@@ -5,13 +5,13 @@
 			<ul>
 				<li class="special">
 					<a href="#menu" class="menuToggle"><span>Menu</span></a>
-					<div id="menu">
+					<div id="menu" data-header-loaded="true">
 						<ul>
 							<li><a th:href="@{/}">Home</a></li>
 							<li><a th:href="@{/manage}">generic</a></li>
 				            <li><a th:href="@{/content}">Content</a></li>
 							<li><a href="#" class="login-link" onclick="toggleSignupPopup()">Sign Up</a></li>
-							<li><a href="#" class="login-link" onclick="toggleLoginPopup()">Log In</a></li>
+							<li><a href="#" class="login-link" onclick="toggleLoginPopup()">LogIn</a></li>
 						</ul>
 					</div>
 				</li>
@@ -19,9 +19,8 @@
 		</nav>
 	</header>
 	
-	<div class="login-popup-wrapper">
-
-	    <div id="login-popup" class="popup hidden">
+	<div id="login-popup" class="login-popup-wrapper hidden">
+	    <div class="popup">
 	        <div class="popup-content glass">
 	            <h2>Login</h2>
 	            <form>
@@ -34,58 +33,24 @@
 	    </div>
 	</div>
 	
-	<div class="login-popup-wrapper">
-	  <div id="signup-popup" class="popup hidden">
-	    <div class="popup-content">
-	      <h2>회원가입</h2>
-	      <form>
-	        <input type="text" placeholder="이름" required />
-	        <input type="email" placeholder="이메일" required />
-	        <input type="text" placeholder="소속" required />
-	        <input type="text" placeholder="아이디" required />
-	        <input type="password" placeholder="비밀번호" required />
-	        <input type="password" placeholder="비밀번호 확인" required />
+	<div id="signup-popup" class="login-popup-wrapper hidden">
+	    <div class="popup">
+	        <div class="popup-content">
+	            <h2>회원가입</h2>
+	            <form>
+	                <input type="text" placeholder="이름" required />
+	                <input type="email" placeholder="이메일" required />
+	                <input type="text" placeholder="소속" required />
+	                <input type="text" placeholder="아이디" required />
+	                <input type="password" placeholder="비밀번호" required />
+	                <input type="password" placeholder="비밀번호 확인" required />
 
-	        <button type="submit">가입하기</button>
-			<!--<button class="button" type="submit">
-			  <div class="button-outer">
-			    <div class="button-inner">
-			      <span>가입하기</span>
-			    </div>
-			  </div>
-			</button>-->
-	        <button type="button" onclick="toggleSignupPopup()">닫기</button>
-	      </form>
+	                <button type="submit">가입하기</button>
+			        <button type="button" onclick="toggleSignupPopup()">닫기</button>
+	            </form>
+	        </div>
 	    </div>
-	  </div>
 	</div>
 	
 
-	<script>
-		function toggleLoginPopup() {
-		  const login = document.getElementById("login-popup");
-		  const signup = document.getElementById("signup-popup");
-
-		  // 회원가입창이 열려 있다면 닫기
-		  if (!signup.classList.contains("hidden")) {
-		    signup.classList.add("hidden");
-		  }
-
-		  // 로그인창 toggle
-		  login.classList.toggle("hidden");
-		}
-
-		function toggleSignupPopup() {
-		  const login = document.getElementById("login-popup");
-		  const signup = document.getElementById("signup-popup");
-
-		  // 로그인창이 열려 있다면 닫기
-		  if (!login.classList.contains("hidden")) {
-		    login.classList.add("hidden");
-		  }
-
-		  // 회원가입창 toggle
-		  signup.classList.toggle("hidden");
-		}
-	</script>
 </div>

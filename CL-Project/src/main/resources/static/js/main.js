@@ -50,25 +50,8 @@
 				offset: $header.outerHeight()
 			});
 
-	// Menu.
-		$('#menu')
-			.append('<a href="#menu" class="close"></a>')
-			.appendTo($body)
-			.panel({
-				delay: 500,
-				hideOnClick: true,
-				hideOnSwipe: true,
-				resetScroll: true,
-				resetForms: true,
-				side: 'right',
-				target: $body,
-				visibleClass: 'is-menu-visible'
-			});
-			
-		$('#menu ul > li > a').on('click', function (e) {
-			    e.preventDefault(); // a 태그 이동 방지 (선택)
-			    $body.removeClass('is-menu-visible');
-			});
+	// Menu (header fragment에서 초기화됨 - 중복 방지)
+		// 메뉴 초기화는 index.html의 JavaScript에서 처리
 
 
 	// Header.

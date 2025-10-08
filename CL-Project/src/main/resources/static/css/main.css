@@ -3317,9 +3317,10 @@ input, select, textarea {
 
 		}
 
-/* Page Wrapper + Menu */
+/* Page Wrapper + Menu (header.css와 충돌 방지) */
 
-	#page-wrapper {
+	/* header.css가 로드되지 않은 경우를 위한 기본 스타일 */
+	#page-wrapper:not([data-header-loaded]) {
 		-moz-transition: opacity 0.5s ease;
 		-webkit-transition: opacity 0.5s ease;
 		-ms-transition: opacity 0.5s ease;
@@ -3328,7 +3329,7 @@ input, select, textarea {
 		padding-top: 3em;
 	}
 
-		#page-wrapper:before {
+		#page-wrapper:not([data-header-loaded]):before {
 			background: rgba(0, 0, 0, 0);
 			content: '';
 			display: block;
@@ -3341,7 +3342,13 @@ input, select, textarea {
 			z-index: 10001;
 		}
 
-	#menu {
+	/* header.css가 로드된 경우 기본 스타일 비활성화 */
+	#page-wrapper[data-header-loaded] {
+		padding-top: 0;
+	}
+
+	/* 메뉴 기본 스타일 (header.css가 로드되지 않은 경우) */
+	#menu:not([data-header-loaded]) {
 		-moz-transform: translateX(20em);
 		-webkit-transform: translateX(20em);
 		-ms-transform: translateX(20em);
@@ -3364,24 +3371,24 @@ input, select, textarea {
 		z-index: 10002;
 	}
 
-		#menu ul {
+		#menu:not([data-header-loaded]) ul {
 			list-style: none;
 			padding: 0;
 		}
 
-			#menu ul > li {
+			#menu:not([data-header-loaded]) ul > li {
 				border-top: solid 1px rgba(0, 0, 0, 0.125);
 				margin: 0.5em 0 0 0;
 				padding: 0.5em 0 0 0;
 			}
 
-				#menu ul > li:first-child {
+				#menu:not([data-header-loaded]) ul > li:first-child {
 					border-top: 0 !important;
 					margin-top: 0 !important;
 					padding-top: 0 !important;
 				}
 
-				#menu ul > li > a {
+				#menu:not([data-header-loaded]) ul > li > a {
 					border: 0;
 					color: inherit;
 					display: block;
@@ -3394,13 +3401,13 @@ input, select, textarea {
 
 					@media screen and (max-width: 736px) {
 
-						#menu ul > li > a {
+						#menu:not([data-header-loaded]) ul > li > a {
 							line-height: 3em;
 						}
 
 					}
 
-		#menu .close {
+		#menu:not([data-header-loaded]) .close {
 			background-image: url("images/close.svg");
 			background-position: 4.85em 1em;
 			background-repeat: no-repeat;
@@ -3417,30 +3424,115 @@ input, select, textarea {
 
 		@media screen and (max-width: 736px) {
 
-			#menu {
+			#menu:not([data-header-loaded]) {
 				padding: 3em 1.5em;
 			}
 
 		}
 
-	body.is-menu-visible #page-wrapper {
+	body.is-menu-visible #page-wrapper:not([data-header-loaded]) {
 		opacity: 0.35;
 	}
 
-		body.is-menu-visible #page-wrapper:before {
+		body.is-menu-visible #page-wrapper:not([data-header-loaded]):before {
 			display: block;
 		}
 
-	body.is-menu-visible #menu {
+	body.is-menu-visible #menu:not([data-header-loaded]) {
 		-moz-transform: translateX(0);
 		-webkit-transform: translateX(0);
 		-ms-transform: translateX(0);
 		transform: translateX(0);
 	}
 
-/* Header */
+	/* data-header-loaded가 있을 때의 메뉴 스타일 */
+	#menu[data-header-loaded] {
+		-moz-transform: translateX(20em);
+		-webkit-transform: translateX(20em);
+		-ms-transform: translateX(20em);
+		transform: translateX(20em);
+		-moz-transition: -moz-transform 0.5s ease;
+		-webkit-transition: -webkit-transform 0.5s ease;
+		-ms-transition: -ms-transform 0.5s ease;
+		transition: transform 0.5s ease;
+		-webkit-overflow-scrolling: touch;
+		background: #824114;
+		color: #ffffff;
+		height: 100%;
+		max-width: 80%;
+		overflow-y: auto;
+		padding: 3em 2em;
+		position: fixed;
+		right: 0;
+		top: 0;
+		width: 20em;
+		z-index: 10002;
+	}
 
-	#header {
+	body.is-menu-visible #menu[data-header-loaded] {
+		-moz-transform: translateX(0);
+		-webkit-transform: translateX(0);
+		-ms-transform: translateX(0);
+		transform: translateX(0);
+	}
+
+	/* data-header-loaded가 있을 때의 메뉴 항목 스타일 */
+	#menu[data-header-loaded] ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+		#menu[data-header-loaded] ul > li {
+			border-top: solid 1px rgba(255, 255, 255, 0.1);
+			margin: 0.5em 0 0 0;
+			padding: 0.5em 0 0 0;
+		}
+
+			#menu[data-header-loaded] ul > li:first-child {
+				border-top: 0 !important;
+				margin-top: 0 !important;
+				padding-top: 0 !important;
+			}
+
+			#menu[data-header-loaded] ul > li > a {
+				border: 0;
+				color: inherit;
+				display: block;
+				font-size: 0.8em;
+				font-weight: bold;
+				letter-spacing: 0.225em;
+				outline: 0;
+				text-decoration: none;
+				text-transform: uppercase;
+			}
+
+				@media screen and (max-width: 736px) {
+					#menu[data-header-loaded] ul > li > a {
+						line-height: 3em;
+					}
+				}
+
+	#menu[data-header-loaded] .close {
+		background-image: url("images/close.svg");
+		background-position: 4.85em 1em;
+		background-repeat: no-repeat;
+		border: 0;
+		content: '';
+		display: block;
+		height: 3em;
+		position: absolute;
+		right: 0;
+		text-indent: 3em;
+		top: 0;
+		vertical-align: middle;
+		width: 7em;
+	}
+
+/* Header (header.css와 충돌 방지) */
+
+	/* header.css가 로드되지 않은 경우를 위한 기본 스타일 */
+	#header:not([data-header-loaded]) {
 		-moz-transition: background-color 0.2s ease;
 		-webkit-transition: background-color 0.2s ease;
 		-ms-transition: background-color 0.2s ease;
@@ -3455,7 +3547,7 @@ input, select, textarea {
 		z-index: 10000;
 	}
 
-		#header h1 {
+		#header:not([data-header-loaded]) h1 {
 			-moz-transition: opacity 0.2s ease;
 			-webkit-transition: opacity 0.2s ease;
 			-ms-transition: opacity 0.2s ease;
@@ -3467,7 +3559,7 @@ input, select, textarea {
 			top: 0;
 		}
 
-			#header h1 a {
+			#header:not([data-header-loaded]) h1 a {
 				border: 0;
 				display: block;
 				height: inherit;
@@ -3476,13 +3568,13 @@ input, select, textarea {
 
 				@media screen and (max-width: 736px) {
 
-					#header h1 a {
+					#header:not([data-header-loaded]) h1 a {
 						font-size: 0.8em;
 					}
 
 				}
 
-		#header nav {
+		#header:not([data-header-loaded]) nav {
 			height: inherit;
 			line-height: inherit;
 			position: absolute;
@@ -3490,19 +3582,19 @@ input, select, textarea {
 			top: 0;
 		}
 
-			#header nav > ul {
+			#header:not([data-header-loaded]) nav > ul {
 				list-style: none;
 				margin: 0;
 				padding: 0;
 				white-space: nowrap;
 			}
 
-				#header nav > ul > li {
+				#header:not([data-header-loaded]) nav > ul > li {
 					display: inline-block;
 					padding: 0;
 				}
 
-					#header nav > ul > li > a {
+					#header:not([data-header-loaded]) nav > ul > li > a {
 						border: 0;
 						color: #fff;
 						display: block;
@@ -3512,12 +3604,12 @@ input, select, textarea {
 						text-transform: uppercase;
 					}
 
-						#header nav > ul > li > a.menuToggle {
+						#header:not([data-header-loaded]) nav > ul > li > a.menuToggle {
 							outline: 0;
 							position: relative;
 						}
 
-							#header nav > ul > li > a.menuToggle:after {
+							#header:not([data-header-loaded]) nav > ul > li > a.menuToggle:after {
 								background-image: url("images/bars.svg");
 								background-position: right center;
 								background-repeat: no-repeat;
@@ -3530,11 +3622,11 @@ input, select, textarea {
 
 							@media screen and (max-width: 736px) {
 
-								#header nav > ul > li > a.menuToggle {
+								#header:not([data-header-loaded]) nav > ul > li > a.menuToggle {
 									padding: 0 1.5em;
 								}
 
-									#header nav > ul > li > a.menuToggle span {
+									#header:not([data-header-loaded]) nav > ul > li > a.menuToggle span {
 										display: none;
 									}
 
@@ -3542,21 +3634,21 @@ input, select, textarea {
 
 						@media screen and (max-width: 736px) {
 
-							#header nav > ul > li > a {
+							#header:not([data-header-loaded]) nav > ul > li > a {
 								padding: 0 0 0 1.5em;
 							}
 
 						}
 
-					#header nav > ul > li:first-child {
+					#header:not([data-header-loaded]) nav > ul > li:first-child {
 						margin-left: 0;
 					}
 
-		#header.alt {
+		#header:not([data-header-loaded]).alt {
 			background: transparent;
 		}
 
-			#header.alt h1 {
+			#header:not([data-header-loaded]).alt h1 {
 				pointer-events: none;
 				opacity: 0;
 			}

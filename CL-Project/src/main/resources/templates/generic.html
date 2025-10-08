@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>영상 편집 툴 (챕터 구간 시각화)</title>
+  
+  <!-- CSS 파일들 -->
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/header.css" />
+  <link rel="stylesheet" href="/css/login.css" />
 
   <style>
     :root{
@@ -16,8 +21,8 @@
     body{ margin:0; background:var(--bg); color:#fff; font-family:Arial, Helvetica, sans-serif; }
 
     /* ===== 2열 레이아웃 + 최소 폭 보장 ===== */
-    .editor-container{ height:100vh; padding:24px; display:flex; justify-content:center; align-items:center; overflow-x:auto; overflow-y:hidden; }
-    .editor-shell{ width:100%; max-width:1400px; min-width:var(--min-shell); height:92vh; display:grid; gap:16px; grid-template-columns:minmax(700px,1fr) 560px; }
+    .editor-container{ height:100vh; padding:24px; padding-top:calc(64px + 24px); display:flex; justify-content:center; align-items:center; overflow-x:auto; overflow-y:hidden; }
+    .editor-shell{ width:100%; max-width:1400px; min-width:var(--min-shell); height:calc(100vh - 64px - 48px); display:grid; gap:16px; grid-template-columns:minmax(700px,1fr) 560px; }
 
     /* ===== 왼쪽 편집기 ===== */
     .editor-inner{ display:flex; flex-direction:column; height:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; overflow:hidden; box-shadow:0 0 10px rgba(0,0,0,.3); min-width:700px; }
@@ -69,7 +74,7 @@
     .right-panel{ background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,.3); display:flex; flex-direction:column; min-width:560px; overflow:auto; }
     .panel-header{ padding:10px 12px; border-bottom:1px solid var(--line); font-size:12px; letter-spacing:2px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; }
     .controls-row{ display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); }
-    .btn{ background:var(--accent); color:white; border:0; border-radius:6px; padding:8px 12px; cursor:pointer; font-weight:600; }
+    .btn{ background:var(--accent); color:white; border:0; border-radius:6px; padding:6px 10px; cursor:pointer; font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:center; line-height:1.2; }
     .btn[disabled]{ opacity:.6; cursor:not-allowed; }
     .status{ font-size:12px; color:#9fb3c8; margin-left:8px; }
     .chapters{ padding:12px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
@@ -96,10 +101,18 @@
     .edit-btn{ padding:8px 16px; border:none; border-radius:4px; cursor:pointer; font-size:12px; }
     .edit-btn.save{ background:var(--accent); color:white; }
     .edit-btn.cancel{ background:var(--line); color:white; }
-    @media (max-width: 1100px){ .editor-shell{ grid-template-columns:1fr; height:auto; } .right-panel{ min-width:0; } }
+    
+    /* 2열 구조 항상 유지 - 최소 너비 보장 */
+    body{ min-width:var(--min-shell); }
+    .editor-shell{ grid-template-columns:minmax(700px,1fr) 560px !important; }
   </style>
 </head>
-<body>
+<body class="generic-page">
+  <!-- Page Wrapper -->
+  <div id="page-wrapper" data-header-loaded="true">
+    <!-- Header Fragment -->
+    <div th:replace="~{fragments/header :: header}"></div>
+  
   <!-- 좌측 비디오 업로드 input (좌측 프리뷰용) -->
   <input type="file" id="video-input" accept="video/*" hidden>
 
@@ -1027,5 +1040,99 @@
     console.log('  - duration:', duration);
     console.log('  - currentVideoFile:', currentVideoFile);
   </script>
+  
+  <!-- Scripts for header functionality -->
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/jquery.scrollex.min.js"></script>
+  <script src="/js/jquery.scrolly.min.js"></script>
+  <script src="/js/browser.min.js"></script>
+  <script src="/js/breakpoints.min.js"></script>
+  <script src="/js/util.js"></script>
+  <script src="/js/main.js"></script>
+  
+  <!-- Custom JavaScript for popups and menu -->
+  <script>
+    // 팝업 토글 함수들
+    function toggleLoginPopup() {
+      const login = document.getElementById("login-popup");
+      const signup = document.getElementById("signup-popup");
+
+      // 회원가입창이 열려 있다면 닫기
+      if (signup && !signup.classList.contains("hidden")) {
+        signup.classList.add("hidden");
+      }
+
+      // 로그인창 toggle
+      if (login) {
+        login.classList.toggle("hidden");
+      }
+    }
+
+    function toggleSignupPopup() {
+      const login = document.getElementById("login-popup");
+      const signup = document.getElementById("signup-popup");
+
+      // 로그인창이 열려 있다면 닫기
+      if (login && !login.classList.contains("hidden")) {
+        login.classList.add("hidden");
+      }
+
+      // 회원가입창 toggle
+      if (signup) {
+        signup.classList.toggle("hidden");
+      }
+    }
+
+    // DOM 로드 완료 후 실행
+    document.addEventListener('DOMContentLoaded', function() {
+      // jQuery가 로드된 후 실행
+      if (typeof $ !== 'undefined') {
+        // 메뉴 초기화 (main.js와 호환)
+        const $menu = $('#menu');
+        if ($menu.length > 0) {
+          // close 버튼이 없으면 추가
+          if ($menu.find('.close').length === 0) {
+            $menu.append('<a href="#menu" class="close"></a>');
+          }
+          
+          // panel 플러그인 초기화
+          $menu.panel({
+            delay: 500,
+            hideOnClick: true,
+            hideOnSwipe: true,
+            resetScroll: true,
+            resetForms: true,
+            side: 'right',
+            target: $('body'),
+            visibleClass: 'is-menu-visible'
+          });
+          
+          // 메뉴 항목 클릭 시 메뉴 닫기
+          $menu.find('ul > li > a').on('click', function (e) {
+            e.preventDefault();
+            $('body').removeClass('is-menu-visible');
+          });
+        }
+      }
+
+      // 팝업 외부 클릭 시 닫기
+      document.addEventListener('click', function(e) {
+        const loginPopup = document.getElementById("login-popup");
+        const signupPopup = document.getElementById("signup-popup");
+        
+        // 팝업 래퍼 자체를 클릭했을 때 (팝업 콘텐츠가 아닌 배경 부분)
+        if (e.target.classList.contains('login-popup-wrapper') || 
+          (e.target.classList.contains('popup') && e.target === e.currentTarget)) {
+          if (loginPopup && !loginPopup.classList.contains('hidden')) {
+            loginPopup.classList.add('hidden');
+          }
+          if (signupPopup && !signupPopup.classList.contains('hidden')) {
+            signupPopup.classList.add('hidden');
+          }
+        }
+      });
+    });
+  </script>
+  </div> <!-- page-wrapper 닫기 -->
 </body>
 </html>

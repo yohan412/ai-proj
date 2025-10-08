@@ -1,233 +1,272 @@
+/* ===== 로그인/회원가입 팝업 스타일 (통합) ===== */
+
+/* CSS 변수 정의 */
+:root {
+	--popup-bg: rgba(0, 0, 0, 0.4);
+	--popup-content-bg: rgba(255, 255, 255, 0.05);
+	--popup-border: rgba(255, 255, 255, 0.2);
+	--popup-text: #ffffff;
+}
+
+/* 팝업 래퍼 */
+.login-popup-wrapper {
+	position: fixed !important;
+	top: 0 !important;
+	left: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	z-index: 10003 !important;
+	display: none !important; /* 기본적으로 숨김 */
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+/* 팝업 래퍼가 표시될 때 */
+.login-popup-wrapper:not(.hidden) {
+	display: flex !important;
+}
+
+/* 팝업 배경 */
 .login-popup-wrapper .popup {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 9999;
+	background: var(--popup-bg) !important;
+	backdrop-filter: blur(5px) !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 100% !important;
+	height: 100% !important;
 }
 
-.login-popup-wrapper .popup.hidden {
-    display: none;
-}
-
+/* 팝업 콘텐츠 */
 .login-popup-wrapper .popup-content {
-    position: relative;
-    width: 450px;
-    padding: 40px;
-    border-radius: 24px;
-
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-
-    box-shadow:
-        0 15px 35px rgba(0, 0, 0, 0.3),
-        0 0 20px rgba(255, 255, 255, 0.08),
-        inset 0 0 1px rgba(255, 255, 255, 0.3),
-        inset 0 10px 20px rgba(255, 255, 255, 0.05);
-
-    text-align: center;
-    color: white;
-    z-index: 10;
+	position: relative !important;
+	width: 450px !important;
+	padding: 40px !important;
+	border-radius: 24px !important;
+	background: var(--popup-content-bg) !important;
+	border: 1px solid var(--popup-border) !important;
+	backdrop-filter: blur(25px) !important;
+	-webkit-backdrop-filter: blur(25px) !important;
+	box-shadow:
+		0 15px 35px rgba(0, 0, 0, 0.3),
+		0 0 20px rgba(255, 255, 255, 0.08),
+		inset 0 0 1px rgba(255, 255, 255, 0.3),
+		inset 0 10px 20px rgba(255, 255, 255, 0.05) !important;
+	text-align: center !important;
+	color: var(--popup-text) !important;
+	z-index: 10 !important;
 }
 
-/* 제목 볼륨감 */
+/* 제목 스타일 */
 .login-popup-wrapper h2 {
-    font-size: 32px;
-    font-weight: 900;
-    letter-spacing: 2px;
-    text-align: center;
-    color: white;
-    text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.6),
-        0 2px 6px rgba(255, 255, 255, 0.2);
-    margin-bottom: 24px;
+	font-size: 32px !important;
+	font-weight: 900 !important;
+	letter-spacing: 2px !important;
+	text-align: center !important;
+	color: var(--popup-text) !important;
+	text-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.6),
+		0 2px 6px rgba(255, 255, 255, 0.2) !important;
+	margin: 0 0 24px 0 !important;
 }
 
-/* 폼 */
+/* 폼 스타일 */
 .login-popup-wrapper form {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: center !important;
+	gap: 14px !important;
 }
 
-/* 입력창 */
+/* 입력 필드 */
 .login-popup-wrapper input {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    font-size: 14px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
+	width: 100% !important;
+	padding: 12px !important;
+	border: none !important;
+	border-radius: 10px !important;
+	background: rgba(255, 255, 255, 0.15) !important;
+	color: var(--popup-text) !important;
+	font-size: 14px !important;
+	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+	backdrop-filter: blur(10px) !important;
 }
 
-/* 버튼 */
+.login-popup-wrapper input::placeholder {
+	color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* 버튼 스타일 */
 .login-popup-wrapper button {
-    margin: 8px auto;
-    padding: 10px 20px;
-    width: 140px;
-    height: 45px;
-
-    font-weight: bold;
-    font-size: 15px;
-    border: none;
-    border-radius: 12px;
-
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    box-shadow:
-        0 4px 10px rgba(0, 0, 0, 0.4),
-        inset 0 1px 1px rgba(255, 255, 255, 0.2);
-
-    backdrop-filter: blur(10px);
-    transition: all 0.2s ease;
-    cursor: pointer;
+	margin: 8px auto !important;
+	padding: 10px 20px !important;
+	width: 140px !important;
+	height: 45px !important;
+	font-weight: bold !important;
+	font-size: 15px !important;
+	border: none !important;
+	border-radius: 12px !important;
+	background: rgba(255, 255, 255, 0.15) !important;
+	color: var(--popup-text) !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	box-shadow:
+		0 4px 10px rgba(0, 0, 0, 0.4),
+		inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+	backdrop-filter: blur(10px) !important;
+	transition: all 0.2s ease !important;
+	cursor: pointer !important;
 }
 
 .login-popup-wrapper button:hover {
-    background: rgba(255, 255, 255, 0.25);
-    box-shadow:
-        0 6px 14px rgba(0, 0, 0, 0.5),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
+	background: rgba(255, 255, 255, 0.25) !important;
+	box-shadow:
+		0 6px 14px rgba(0, 0, 0, 0.5),
+		inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
 }
 
+.login-popup-wrapper button[type="button"] {
+	background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.login-popup-wrapper button[type="button"]:hover {
+	background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ===== 반응형 디자인 ===== */
+@media screen and (max-width: 736px) {
+	.login-popup-wrapper .popup-content {
+		width: 90% !important;
+		padding: 30px !important;
+	}
+}
+
+/* ===== 고급 버튼 스타일 (선택적 사용) ===== */
 .login-popup-wrapper .button {
-  all: unset;
-  cursor: pointer;
-  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-  position: relative;
-  border-radius: 100em;
-  background-color: rgba(0, 0, 0, 0.75);
-  box-shadow:
-    -0.15em -0.15em 0.15em -0.075em rgba(5, 5, 5, 0.25),
-    0.0375em 0.0375em 0.0675em 0 rgba(5, 5, 5, 0.1);
+	all: unset;
+	cursor: pointer;
+	-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+	position: relative;
+	border-radius: 100em;
+	background-color: rgba(0, 0, 0, 0.75);
+	box-shadow:
+		-0.15em -0.15em 0.15em -0.075em rgba(5, 5, 5, 0.25),
+		0.0375em 0.0375em 0.0675em 0 rgba(5, 5, 5, 0.1);
 }
 
 .login-popup-wrapper .button::after {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  width: calc(100% + 0.3em);
-  height: calc(100% + 0.3em);
-  top: -0.15em;
-  left: -0.15em;
-  border-radius: inherit;
-  background: linear-gradient(
-    -135deg,
-    rgba(5, 5, 5, 0.5),
-    transparent 20%,
-    transparent 100%
-  );
-  filter: blur(0.0125em);
-  opacity: 0.25;
-  mix-blend-mode: multiply;
+	content: "";
+	position: absolute;
+	z-index: 0;
+	width: calc(100% + 0.3em);
+	height: calc(100% + 0.3em);
+	top: -0.15em;
+	left: -0.15em;
+	border-radius: inherit;
+	background: linear-gradient(
+		-135deg,
+		rgba(5, 5, 5, 0.5),
+		transparent 20%,
+		transparent 100%
+	);
+	filter: blur(0.0125em);
+	opacity: 0.25;
+	mix-blend-mode: multiply;
 }
 
 .login-popup-wrapper .button .button-outer {
-  position: relative;
-  z-index: 1;
-  border-radius: inherit;
-  transition: box-shadow 300ms ease;
-  will-change: box-shadow;
-  box-shadow:
-    0 0.05em 0.05em -0.01em rgba(5, 5, 5, 1),
-    0 0.01em 0.01em -0.01em rgba(5, 5, 5, 0.5),
-    0.15em 0.3em 0.1em -0.01em rgba(5, 5, 5, 0.25);
+	position: relative;
+	z-index: 1;
+	border-radius: inherit;
+	transition: box-shadow 300ms ease;
+	will-change: box-shadow;
+	box-shadow:
+		0 0.05em 0.05em -0.01em rgba(5, 5, 5, 1),
+		0 0.01em 0.01em -0.01em rgba(5, 5, 5, 0.5),
+		0.15em 0.3em 0.1em -0.01em rgba(5, 5, 5, 0.25);
 }
 
 .login-popup-wrapper .button:hover .button-outer {
-  box-shadow:
-    0 0 0 0 rgba(5, 5, 5, 1),
-    0 0 0 0 rgba(5, 5, 5, 0.5),
-    0 0 0 0 rgba(5, 5, 5, 0.25);
+	box-shadow:
+		0 0 0 0 rgba(5, 5, 5, 1),
+		0 0 0 0 rgba(5, 5, 5, 0.5),
+		0 0 0 0 rgba(5, 5, 5, 0.25);
 }
 
 .login-popup-wrapper .button-inner {
-  --inset: 0.035em;
-  position: relative;
-  z-index: 1;
-  border-radius: inherit;
-  padding: 1em 1.5em;
-  background-image: linear-gradient(
-    135deg,
-    rgba(230, 230, 230, 1),
-    rgba(180, 180, 180, 1)
-  );
-  transition:
-    box-shadow 300ms ease,
-    clip-path 250ms ease,
-    background-image 250ms ease,
-    transform 250ms ease;
-  will-change: box-shadow, clip-path, background-image, transform;
-  overflow: clip;
-  clip-path: inset(0 0 0 0 round 100em);
-  box-shadow:
-        /* 1 */
-    0 0 0 0 inset rgba(5, 5, 5, 0.1),
-    /* 2 */ -0.05em -0.05em 0.05em 0 inset rgba(5, 5, 5, 0.25),
-    /* 3 */ 0 0 0 0 inset rgba(5, 5, 5, 0.1),
-    /* 4 */ 0 0 0.05em 0.2em inset rgba(255, 255, 255, 0.25),
-    /* 5 */ 0.025em 0.05em 0.1em 0 inset rgba(255, 255, 255, 1),
-    /* 6 */ 0.12em 0.12em 0.12em inset rgba(255, 255, 255, 0.25),
-    /* 7 */ -0.075em -0.25em 0.25em 0.1em inset rgba(5, 5, 5, 0.25);
+	--inset: 0.035em;
+	position: relative;
+	z-index: 1;
+	border-radius: inherit;
+	padding: 1em 1.5em;
+	background-image: linear-gradient(
+		135deg,
+		rgba(230, 230, 230, 1),
+		rgba(180, 180, 180, 1)
+	);
+	transition:
+		box-shadow 300ms ease,
+		clip-path 250ms ease,
+		background-image 250ms ease,
+		transform 250ms ease;
+	will-change: box-shadow, clip-path, background-image, transform;
+	overflow: clip;
+	clip-path: inset(0 0 0 0 round 100em);
+	box-shadow:
+			/* 1 */
+		0 0 0 0 inset rgba(5, 5, 5, 0.1),
+		/* 2 */ -0.05em -0.05em 0.05em 0 inset rgba(5, 5, 5, 0.25),
+		/* 3 */ 0 0 0 0 inset rgba(5, 5, 5, 0.1),
+		/* 4 */ 0 0 0.05em 0.2em inset rgba(255, 255, 255, 0.25),
+		/* 5 */ 0.025em 0.05em 0.1em 0 inset rgba(255, 255, 255, 1),
+		/* 6 */ 0.12em 0.12em 0.12em inset rgba(255, 255, 255, 0.25),
+		/* 7 */ -0.075em -0.25em 0.25em 0.1em inset rgba(5, 5, 5, 0.25);
 }
 
 .login-popup-wrapper .button:hover .button-inner {
-  clip-path: inset(
-    clamp(1px, 0.0625em, 2px) clamp(1px, 0.0625em, 2px)
-      clamp(1px, 0.0625em, 2px) clamp(1px, 0.0625em, 2px) round 100em
-  );
-  box-shadow:
-        /* 1 */
-    0.1em 0.15em 0.05em 0 inset rgba(5, 5, 5, 0.75),
-    /* 2 */ -0.025em -0.03em 0.05em 0.025em inset rgba(5, 5, 5, 0.5),
-    /* 3 */ 0.25em 0.25em 0.2em 0 inset rgba(5, 5, 5, 0.5),
-    /* 4 */ 0 0 0.05em 0.5em inset rgba(255, 255, 255, 0.15),
-    /* 5 */ 0 0 0 0 inset rgba(255, 255, 255, 1),
-    /* 6 */ 0.12em 0.12em 0.12em inset rgba(255, 255, 255, 0.25),
-    /* 7 */ -0.075em -0.12em 0.2em 0.1em inset rgba(5, 5, 5, 0.25);
+	clip-path: inset(
+		clamp(1px, 0.0625em, 2px) clamp(1px, 0.0625em, 2px)
+			clamp(1px, 0.0625em, 2px) clamp(1px, 0.0625em, 2px) round 100em
+	);
+	box-shadow:
+			/* 1 */
+		0.1em 0.15em 0.05em 0 inset rgba(5, 5, 5, 0.75),
+		/* 2 */ -0.025em -0.03em 0.05em 0.025em inset rgba(5, 5, 5, 0.5),
+		/* 3 */ 0.25em 0.25em 0.2em 0 inset rgba(5, 5, 5, 0.5),
+		/* 4 */ 0 0 0.05em 0.5em inset rgba(255, 255, 255, 0.15),
+		/* 5 */ 0 0 0 0 inset rgba(255, 255, 255, 1),
+		/* 6 */ 0.12em 0.12em 0.12em inset rgba(255, 255, 255, 0.25),
+		/* 7 */ -0.075em -0.12em 0.2em 0.1em inset rgba(5, 5, 5, 0.25);
 }
 
 .login-popup-wrapper .button .button-inner span {
-  position: relative;
-  z-index: 4;
-  font-family: "Inter", sans-serif;
-  letter-spacing: -0.05em;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0);
-  background-image: linear-gradient(
-    135deg,
-    rgba(25, 25, 25, 1),
-    rgba(75, 75, 75, 1)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  transition: transform 250ms ease;
-  display: block;
-  will-change: transform;
-  text-shadow: rgba(0, 0, 0, 0.1) 0 0 0.1em;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+	position: relative;
+	z-index: 4;
+	font-family: "Inter", sans-serif;
+	letter-spacing: -0.05em;
+	font-weight: 500;
+	color: rgba(0, 0, 0, 0);
+	background-image: linear-gradient(
+		135deg,
+		rgba(25, 25, 25, 1),
+		rgba(75, 75, 75, 1)
+	);
+	-webkit-background-clip: text;
+	background-clip: text;
+	transition: transform 250ms ease;
+	display: block;
+	will-change: transform;
+	text-shadow: rgba(0, 0, 0, 0.1) 0 0 0.1em;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
 
 .login-popup-wrapper .button:hover .button-inner span {
-  transform: scale(0.975);
+	transform: scale(0.975);
 }
 
 .login-popup-wrapper .button:active .button-inner {
-  transform: scale(0.975);
+	transform: scale(0.975);
 }

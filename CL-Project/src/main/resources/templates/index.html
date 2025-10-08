@@ -10,13 +10,14 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="/css/main.css" />
+		<link rel="stylesheet" href="/css/header.css" />
 		<link rel="stylesheet" href="/css/login.css" />
 		<noscript><link rel="stylesheet" href="/css/noscript.css" /></noscript>
 	</head>
 	<body class="landing is-preload">
 
 		<!-- Page Wrapper -->
-			<div id="page-wrapper">
+			<div id="page-wrapper" data-header-loaded="true">
 			
 				<!-- Header -->
 				<!-- Left Sidebar fragment: navigation menu -->
@@ -154,6 +155,90 @@
 		<script src="/js/breakpoints.min.js"></script>
 		<script src="/js/util.js"></script>
 		<script src="/js/main.js"></script>
+		
+		<!-- Custom JavaScript for popups and menu -->
+		<script>
+			// 팝업 토글 함수들
+			function toggleLoginPopup() {
+				const login = document.getElementById("login-popup");
+				const signup = document.getElementById("signup-popup");
+
+				// 회원가입창이 열려 있다면 닫기
+				if (signup && !signup.classList.contains("hidden")) {
+					signup.classList.add("hidden");
+				}
+
+				// 로그인창 toggle
+				if (login) {
+					login.classList.toggle("hidden");
+				}
+			}
+
+			function toggleSignupPopup() {
+				const login = document.getElementById("login-popup");
+				const signup = document.getElementById("signup-popup");
+
+				// 로그인창이 열려 있다면 닫기
+				if (login && !login.classList.contains("hidden")) {
+					login.classList.add("hidden");
+				}
+
+				// 회원가입창 toggle
+				if (signup) {
+					signup.classList.toggle("hidden");
+				}
+			}
+
+			// DOM 로드 완료 후 실행
+			document.addEventListener('DOMContentLoaded', function() {
+				// jQuery가 로드된 후 실행
+				if (typeof $ !== 'undefined') {
+					// 메뉴 초기화 (main.js와 호환)
+					const $menu = $('#menu');
+					if ($menu.length > 0) {
+						// close 버튼이 없으면 추가
+						if ($menu.find('.close').length === 0) {
+							$menu.append('<a href="#menu" class="close"></a>');
+						}
+						
+						// panel 플러그인 초기화
+						$menu.panel({
+							delay: 500,
+							hideOnClick: true,
+							hideOnSwipe: true,
+							resetScroll: true,
+							resetForms: true,
+							side: 'right',
+							target: $('body'),
+							visibleClass: 'is-menu-visible'
+						});
+						
+						// 메뉴 항목 클릭 시 메뉴 닫기
+						$menu.find('ul > li > a').on('click', function (e) {
+							e.preventDefault();
+							$('body').removeClass('is-menu-visible');
+						});
+					}
+				}
+
+				// 팝업 외부 클릭 시 닫기
+				document.addEventListener('click', function(e) {
+					const loginPopup = document.getElementById("login-popup");
+					const signupPopup = document.getElementById("signup-popup");
+					
+					// 팝업 래퍼 자체를 클릭했을 때 (팝업 콘텐츠가 아닌 배경 부분)
+					if (e.target.classList.contains('login-popup-wrapper') || 
+						(e.target.classList.contains('popup') && e.target === e.currentTarget)) {
+						if (loginPopup && !loginPopup.classList.contains('hidden')) {
+							loginPopup.classList.add('hidden');
+						}
+						if (signupPopup && !signupPopup.classList.contains('hidden')) {
+							signupPopup.classList.add('hidden');
+						}
+					}
+				});
+			});
+		</script>
 
 	</body>
 </html>
