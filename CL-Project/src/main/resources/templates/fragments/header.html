@@ -23,11 +23,12 @@
 	    <div class="popup">
 	        <div class="popup-content glass">
 	            <h2>Login</h2>
-	            <form>
-	                <input type="text" placeholder="아이디" required><br>
-	                <input type="password" placeholder="비밀번호" required><br>
+	            <form id="login-form">
+	                <input type="text" id="login-username" name="username" placeholder="아이디" required><br>
+	                <input type="password" id="login-password" name="password" placeholder="비밀번호" required><br>
+	                <div id="login-error" style="color: #ff4444; font-size: 12px; margin: 10px 0; display: none;"></div>
 	                <button type="submit">로그인</button>
-					<button type="button" onclick="toggleLoginPopup()">닫기</button>
+				<button type="button" onclick="toggleLoginPopup()">닫기</button>
 	            </form>
 	        </div>
 	    </div>
@@ -37,16 +38,16 @@
 	    <div class="popup">
 	        <div class="popup-content">
 	            <h2>회원가입</h2>
-	            <form>
-	                <input type="text" placeholder="이름" required />
-	                <input type="email" placeholder="이메일" required />
-	                <input type="text" placeholder="소속" required />
-	                <input type="text" placeholder="아이디" required />
-	                <input type="password" placeholder="비밀번호" required />
-	                <input type="password" placeholder="비밀번호 확인" required />
-
+	            <form id="signup-form">
+	                <input type="text" id="signup-name" name="name" placeholder="이름" required />
+	                <input type="email" id="signup-email" name="email" placeholder="이메일" required />
+	                <input type="text" id="signup-organization" name="organization" placeholder="소속" required />
+	                <input type="text" id="signup-username" name="username" placeholder="아이디" minlength="4" required />
+	                <input type="password" id="signup-password" name="password" placeholder="비밀번호" minlength="8" required />
+	                <input type="password" id="signup-password-confirm" name="passwordConfirm" placeholder="비밀번호 확인" required />
+	                <div id="signup-error" style="color: #ff4444; font-size: 12px; margin: 10px 0; display: none;"></div>
 	                <button type="submit">가입하기</button>
-			        <button type="button" onclick="toggleSignupPopup()">닫기</button>
+		        <button type="button" onclick="toggleSignupPopup()">닫기</button>
 	            </form>
 	        </div>
 	    </div>

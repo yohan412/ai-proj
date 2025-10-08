@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>영상 편집 툴 (챕터 구간 시각화)</title>
-  
+
   <!-- CSS 파일들 -->
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/header.css" />
@@ -36,10 +36,40 @@
     .chapter-overlay{ position:absolute; bottom:15px; left:15px; background:rgba(0,0,0,0.85); color:white; padding:10px 15px; border-radius:6px; font-size:13px; z-index:50; display:none; border-left:4px solid var(--accent); }
     .preview-area.has-chapter .chapter-overlay{ display:block; }
     
-    /* X 버튼 스타일 */
-    .close-button{ position:absolute; top:15px; right:15px; width:36px; height:36px; background:rgba(0,0,0,0.75); color:white; border:2px solid rgba(255,255,255,0.3); border-radius:50%; cursor:pointer; font-size:20px; font-weight:bold; z-index:100; display:none; transition:all 0.2s; line-height:32px; text-align:center; }
-    .close-button:hover{ background:rgba(255,77,77,0.9); border-color:rgba(255,255,255,0.6); transform:scale(1.1); }
-    .preview-area.has-chapter .close-button{ display:block; }
+    /* X 버튼 스타일 - 기본적으로 숨김 */
+    .close-button{ 
+        position:absolute; 
+        top:15px; 
+        right:15px; 
+        width:36px; 
+        height:36px; 
+        background:rgba(0,0,0,0.75); 
+        color:white; 
+        border:2px solid rgba(255,255,255,0.3); 
+        border-radius:50%; 
+        cursor:pointer; 
+        font-size:18px; 
+        font-weight:bold; 
+        z-index:100; 
+        display:none; 
+        transition:all 0.2s; 
+        padding:0; 
+        margin:0; 
+        box-sizing:border-box;
+        align-items:center; 
+        justify-content:center;
+    }
+    
+    .close-button:hover{ 
+        background:rgba(255,77,77,0.9); 
+        border-color:rgba(255,255,255,0.6); 
+        transform:scale(1.1); 
+    }
+    
+    /* 챕터 재생 중일 때만 X 버튼 표시 */
+    .preview-area.has-chapter .close-button{ 
+        display:flex !important; 
+    }
 
     /* ===== 타임라인 ===== */
     .timeline-container{ position:relative; background:var(--panel); padding:48px 20px 20px; border-top:1px solid var(--line); min-height:var(--min-timeline-h); }
@@ -90,17 +120,261 @@
     .chapter-card:hover .chapter-edit{ display:block; }
     .chapter-edit:hover{ background:rgba(0,0,0,0.9); }
     
-    /* 구간 편집 모달 */
-    .edit-modal{ position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:none; align-items:center; justify-content:center; }
+    /* 구간 편집 모달 - 글래스모피즘 스타일 */
+    .edit-modal{ 
+        position:fixed; 
+        top:0; 
+        left:0; 
+        width:100%; 
+        height:100%; 
+        background:rgba(0,0,0,0.4); 
+        backdrop-filter:blur(5px); 
+        -webkit-backdrop-filter:blur(5px); 
+        z-index:1000; 
+        display:none; 
+        align-items:center; 
+        justify-content:center; 
+    }
     .edit-modal.active{ display:flex; }
-    .edit-content{ background:var(--panel); padding:20px; border-radius:8px; min-width:400px; }
-    .edit-row{ display:flex; gap:10px; margin-bottom:10px; align-items:center; }
-    .edit-row label{ min-width:60px; font-size:12px; color:#c9d6e3; }
-    .edit-row input{ flex:1; padding:6px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); color:white; }
-    .edit-buttons{ display:flex; gap:10px; justify-content:flex-end; margin-top:15px; }
-    .edit-btn{ padding:8px 16px; border:none; border-radius:4px; cursor:pointer; font-size:12px; }
-    .edit-btn.save{ background:var(--accent); color:white; }
-    .edit-btn.cancel{ background:var(--line); color:white; }
+    
+    .edit-content{ 
+        position:relative;
+        width:450px;
+        padding:40px;
+        border-radius:24px;
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.2);
+        backdrop-filter:blur(25px);
+        -webkit-backdrop-filter:blur(25px);
+        box-shadow:
+            0 15px 35px rgba(0,0,0,0.3),
+            0 0 20px rgba(255,255,255,0.08),
+            inset 0 0 1px rgba(255,255,255,0.3),
+            inset 0 10px 20px rgba(255,255,255,0.05);
+        text-align:center;
+        color:#ffffff;
+    }
+    
+    .edit-content h3{ 
+        font-size:32px;
+        font-weight:900;
+        letter-spacing:2px;
+        text-align:center;
+        color:#ffffff;
+        text-shadow:
+            0 1px 2px rgba(0,0,0,0.6),
+            0 2px 6px rgba(255,255,255,0.2);
+        margin:0 0 24px 0;
+    }
+    
+    .edit-row{ 
+        display:flex; 
+        gap:12px; 
+        margin-bottom:16px; 
+        align-items:center; 
+    }
+    
+    .edit-row label{ 
+        min-width:70px; 
+        font-size:13px; 
+        color:#c9d6e3; 
+        font-weight:500; 
+    }
+    
+    .edit-row input{ 
+        flex:1;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        font-size:14px;
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s; 
+    }
+    
+    .edit-row input::placeholder{
+        color:rgba(255,255,255,0.7);
+    }
+    
+    .edit-row input:focus{ 
+        outline:none;
+        background:rgba(255,255,255,0.2);
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .edit-buttons{ 
+        display:flex; 
+        gap:12px; 
+        justify-content:flex-end; 
+        margin-top:24px; 
+    }
+    
+    .edit-btn{ 
+        margin:8px auto;
+        padding:10px 20px;
+        width:140px;
+        height:45px;
+        font-weight:bold;
+        font-size:15px;
+        border:none;
+        border-radius:12px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        box-shadow:
+            0 4px 10px rgba(0,0,0,0.4),
+            inset 0 1px 1px rgba(255,255,255,0.2);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s ease;
+        cursor:pointer;
+    }
+    
+    .edit-btn:hover{ 
+        background:rgba(255,255,255,0.25);
+        box-shadow:
+            0 6px 14px rgba(0,0,0,0.5),
+            inset 0 1px 2px rgba(255,255,255,0.3);
+    }
+    
+    .edit-btn.cancel{ 
+        background:rgba(255,255,255,0.1);
+    }
+    
+    .edit-btn.cancel:hover{ 
+        background:rgba(255,255,255,0.2);
+    }
+    
+    /* 새 구간 생성 모달 - 동일한 글래스모피즘 스타일 */
+    .create-modal{ 
+        position:fixed; 
+        top:0; 
+        left:0; 
+        width:100%; 
+        height:100%; 
+        background:rgba(0,0,0,0.4); 
+        backdrop-filter:blur(5px); 
+        -webkit-backdrop-filter:blur(5px); 
+        z-index:1000; 
+        display:none; 
+        align-items:center; 
+        justify-content:center; 
+    }
+    .create-modal.active{ display:flex; }
+    
+    .create-content{ 
+        position:relative;
+        width:450px;
+        padding:40px;
+        border-radius:24px;
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.2);
+        backdrop-filter:blur(25px);
+        -webkit-backdrop-filter:blur(25px);
+        box-shadow:
+            0 15px 35px rgba(0,0,0,0.3),
+            0 0 20px rgba(255,255,255,0.08),
+            inset 0 0 1px rgba(255,255,255,0.3),
+            inset 0 10px 20px rgba(255,255,255,0.05);
+        text-align:center;
+        color:#ffffff;
+    }
+    
+    .create-content h3{ 
+        font-size:32px;
+        font-weight:900;
+        letter-spacing:2px;
+        text-align:center;
+        color:#ffffff;
+        text-shadow:
+            0 1px 2px rgba(0,0,0,0.6),
+            0 2px 6px rgba(255,255,255,0.2);
+        margin:0 0 24px 0;
+    }
+    
+    .create-row{ 
+        display:flex; 
+        gap:12px; 
+        margin-bottom:16px; 
+        align-items:center; 
+    }
+    
+    .create-row label{ 
+        min-width:70px; 
+        font-size:13px; 
+        color:#c9d6e3; 
+        font-weight:500; 
+    }
+    
+    .create-row input{ 
+        flex:1;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        font-size:14px;
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s; 
+    }
+    
+    .create-row input::placeholder{
+        color:rgba(255,255,255,0.7);
+    }
+    
+    .create-row input:focus{ 
+        outline:none;
+        background:rgba(255,255,255,0.2);
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .create-buttons{ 
+        display:flex; 
+        gap:12px; 
+        justify-content:flex-end; 
+        margin-top:24px; 
+    }
+    
+    .create-btn{ 
+        margin:8px auto;
+        padding:10px 20px;
+        width:140px;
+        height:45px;
+        font-weight:bold;
+        font-size:15px;
+        border:none;
+        border-radius:12px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        box-shadow:
+            0 4px 10px rgba(0,0,0,0.4),
+            inset 0 1px 1px rgba(255,255,255,0.2);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s ease;
+        cursor:pointer;
+    }
+    
+    .create-btn:hover{ 
+        background:rgba(255,255,255,0.25);
+        box-shadow:
+            0 6px 14px rgba(0,0,0,0.5),
+            inset 0 1px 2px rgba(255,255,255,0.3);
+    }
+    
+    .create-btn.cancel{ 
+        background:rgba(255,255,255,0.1);
+    }
+    
+    .create-btn.cancel:hover{ 
+        background:rgba(255,255,255,0.2);
+    }
     
     /* 2열 구조 항상 유지 - 최소 너비 보장 */
     body{ min-width:var(--min-shell); }
@@ -122,7 +396,7 @@
       <div class="editor-inner">
         <div class="preview-area" id="preview-area" title="클릭 또는 드래그&드롭으로 영상 불러오기">
           <div id="video-wrapper" style="position:relative; max-width:100%; max-height:100%; display:flex; align-items:center; justify-content:center;">
-            <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
+          <img id="preview-media" alt="video preview" src="https://via.placeholder.com/360x640/000000/FFFFFF?text=PREVIEW"/>
           </div>
           <div class="chapter-overlay" id="chapter-overlay">
             <div style="font-weight:bold; margin-bottom:4px;">🎬 구간 재생 중</div>
@@ -157,7 +431,7 @@
   <!-- 구간 편집 모달 -->
   <div class="edit-modal" id="edit-modal">
     <div class="edit-content">
-      <h3 style="margin:0 0 15px 0; color:white;">구간 편집</h3>
+      <h3>구간 편집</h3>
       <div class="edit-row">
         <label>제목:</label>
         <input type="text" id="edit-title" placeholder="챕터 제목">
@@ -182,28 +456,28 @@
   </div>
 
   <!-- 새 구간 생성 모달 -->
-  <div class="edit-modal" id="create-modal">
-    <div class="edit-content">
-      <h3 style="margin:0 0 15px 0; color:white;">새 구간 생성</h3>
-      <div class="edit-row">
+  <div class="create-modal" id="create-modal">
+    <div class="create-content">
+      <h3>새 구간 생성</h3>
+      <div class="create-row">
         <label>제목:</label>
         <input type="text" id="create-title" placeholder="챕터 제목">
       </div>
-      <div class="edit-row">
+      <div class="create-row">
         <label>시작:</label>
         <input type="number" id="create-start" step="0.1" placeholder="시작 시간(초)">
       </div>
-      <div class="edit-row">
+      <div class="create-row">
         <label>종료:</label>
         <input type="number" id="create-end" step="0.1" placeholder="종료 시간(초)">
       </div>
-      <div class="edit-row">
+      <div class="create-row">
         <label>요약:</label>
         <input type="text" id="create-summary" placeholder="챕터 요약">
       </div>
-      <div class="edit-buttons">
-        <button class="edit-btn save" id="save-create">생성</button>
-        <button class="edit-btn cancel" id="cancel-create">취소</button>
+      <div class="create-buttons">
+        <button class="create-btn save" id="save-create">생성</button>
+        <button class="create-btn cancel" id="cancel-create">취소</button>
       </div>
     </div>
   </div>
@@ -384,9 +658,9 @@
         p.thumb.classList.add('active');
         // 마커가 생성된 경우에만 활성화
         if(p.markersCreated) {
-          p.startMarker.classList.add('active');
-          p.endMarker.classList.add('active');
-          p.band.classList.add('active');
+        p.startMarker.classList.add('active');
+        p.endMarker.classList.add('active');
+        p.band.classList.add('active');
         }
       }
       highlightChapterCardById(id);
@@ -1049,6 +1323,8 @@
   <script src="/js/breakpoints.min.js"></script>
   <script src="/js/util.js"></script>
   <script src="/js/main.js"></script>
+  <script src="/js/signup.js"></script>
+  <script src="/js/login.js"></script>
   
   <!-- Custom JavaScript for popups and menu -->
   <script>
