@@ -8,6 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class ManageController {
 	@GetMapping({"/manage" })
     public String mainPage(Model model) {
-        return "generic";
+        return "manage";
     }
 }

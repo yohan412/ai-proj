@@ -99,8 +99,11 @@ public class SecurityConfig {
                 // 영상 관리 API 허용 (임시)
                 .requestMatchers("/api/videos/**").permitAll()
                 
-                // 영상 편집 페이지는 인증 필요 (나중에 활성화)
-                .requestMatchers("/manage", "/generic").permitAll()  // 임시로 허용
+                // 시선 추적 API 허용
+                .requestMatchers("/api/gaze/**").permitAll()
+                
+                // 페이지 허용
+                .requestMatchers("/manage", "/generic", "/content", "/content.html").permitAll()  // 임시로 허용
                 
                 // 나머지 요청은 인증 필요
                 .anyRequest().authenticated()

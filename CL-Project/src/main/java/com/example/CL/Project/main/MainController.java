@@ -12,8 +12,4 @@ public class MainController {
         return "index";
     }
 
-    @GetMapping("/editor")
-    public String editorPage(Model model) {
-        return "generic";
-    }
 }

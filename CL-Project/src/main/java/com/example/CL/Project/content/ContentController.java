@@ -8,6 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class ContentController {
 	@GetMapping({"/content" })
     public String mainPage(Model model) {
-        return "contents";
+        return "content";
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,26 @@ public class VideoController {
     public ResponseEntity<?> getAllVideos() {
         try {
             List<Video> videos = videoService.getAllVideos();
-            return ResponseEntity.ok(videos);
+            
+            // 각 영상에 구간 개수 추가
+            List<Map<String, Object>> videosWithChapterCount = new ArrayList<>();
+            for (Video video : videos) {
+                Map<String, Object> videoData = new HashMap<>();
+                videoData.put("videoId", video.getVideoId());
+                videoData.put("userName", video.getUserName());
+                videoData.put("storedName", video.getStoredName());
+                videoData.put("duration", video.getDuration());
+                videoData.put("createdAt", video.getCreatedAt());
+                videoData.put("updatedAt", video.getUpdatedAt());
+                
+                // 구간 개수 조회
+                List<VideoChapter> chapters = videoService.getChaptersByStoredName(video.getStoredName());
+                videoData.put("chapterCount", chapters.size());
+                
+                videosWithChapterCount.add(videoData);
+            }
+            
+            return ResponseEntity.ok(videosWithChapterCount);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
