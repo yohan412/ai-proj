@@ -21,18 +21,20 @@ public class VideoController {
     
     @PostMapping("/save")
     public ResponseEntity<?> saveVideo(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestParam("userName") String userName,
             @RequestParam(value = "duration", required = false, defaultValue = "0") Double duration,
-            @RequestParam(value = "chapters", required = false) String chaptersJson) {
+            @RequestParam(value = "chapters", required = false) String chaptersJson,
+            @RequestParam(value = "storedName", required = false) String existingStoredName) {
         
         System.out.println("====================================");
         System.out.println("🔵 영상 저장 요청 수신");
-        System.out.println("  - 파일명: " + file.getOriginalFilename());
-        System.out.println("  - 파일 크기: " + file.getSize() + " bytes");
+        System.out.println("  - 파일명: " + (file != null ? file.getOriginalFilename() : "없음 (업데이트)"));
+        System.out.println("  - 파일 크기: " + (file != null ? file.getSize() + " bytes" : "없음"));
         System.out.println("  - 사용자 이름: " + userName);
         System.out.println("  - 영상 길이: " + duration + " 초");
         System.out.println("  - 챕터 JSON 길이: " + (chaptersJson != null ? chaptersJson.length() : 0));
+        System.out.println("  - 기존 storedName: " + existingStoredName);
         System.out.println("====================================");
         
         try {
@@ -57,15 +59,30 @@ public class VideoController {
                 System.out.println("⚠️ 챕터 정보 없음");
             }
             
-            System.out.println("💾 VideoService.saveVideo 호출...");
-            Video savedVideo = videoService.saveVideo(file, request);
-            System.out.println("✅ 저장 완료!");
+            Video savedVideo;
+            
+            // 기존 영상 업데이트 vs 새 영상 저장
+            if (existingStoredName != null && !existingStoredName.trim().isEmpty()) {
+                // 업데이트 모드: 파일은 그대로, userName과 챕터만 업데이트
+                System.out.println("🔄 기존 영상 업데이트 모드");
+                savedVideo = videoService.updateVideo(existingStoredName, request);
+                System.out.println("✅ 업데이트 완료!");
+            } else {
+                // 새 영상 저장 모드
+                if (file == null || file.isEmpty()) {
+                    throw new IllegalArgumentException("파일이 없습니다.");
+                }
+                System.out.println("💾 새 영상 저장 모드");
+                savedVideo = videoService.saveVideo(file, request);
+                System.out.println("✅ 저장 완료!");
+            }
+            
             System.out.println("  - Video ID: " + savedVideo.getVideoId());
             System.out.println("  - Stored Name: " + savedVideo.getStoredName());
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "영상이 저장되었습니다.");
+            response.put("message", existingStoredName != null ? "영상이 업데이트되었습니다." : "영상이 저장되었습니다.");
             response.put("videoId", savedVideo.getVideoId());
             response.put("storedName", savedVideo.getStoredName());
             
@@ -73,7 +90,7 @@ public class VideoController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            System.err.println("❌ 저장 실패!");
+            System.err.println("❌ 저장/업데이트 실패!");
             System.err.println("오류 메시지: " + e.getMessage());
             e.printStackTrace();
             

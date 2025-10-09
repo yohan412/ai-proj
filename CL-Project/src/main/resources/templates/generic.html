@@ -116,9 +116,12 @@
     .chapter-summary{ font-size:13px; color:#e7f1ff; opacity:.95; }
     
     /* 구간 편집 컨트롤 */
-    .chapter-edit{ position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer; display:none; }
-    .chapter-card:hover .chapter-edit{ display:block; }
+    .chapter-controls{ position:absolute; top:5px; right:5px; display:none; gap:4px; }
+    .chapter-card:hover .chapter-controls{ display:flex; }
+    .chapter-edit{ background:rgba(0,0,0,0.7); color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer; }
     .chapter-edit:hover{ background:rgba(0,0,0,0.9); }
+    .chapter-delete{ background:rgba(255,0,0,0.7); color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer; font-weight:bold; }
+    .chapter-delete:hover{ background:rgba(255,0,0,0.9); transform:scale(1.05); }
     
     /* 구간 편집 모달 - 글래스모피즘 스타일 */
     .edit-modal{ 
@@ -818,6 +821,7 @@
     let currentChapter = null; // 현재 재생 중인 챕터
     let editingChapterId = null; // 편집 중인 챕터 ID
     let analyzedChapters = []; // 분석된 챕터 데이터 저장
+    let currentStoredName = null; // 현재 로드된 영상의 storedName (업데이트용)
     
     console.log('🔧 변수 초기화 완료');
 
@@ -837,6 +841,7 @@
 
     function loadVideo(file){
       currentVideoFile = file;
+      currentStoredName = null; // 새 파일 로드 시 storedName 초기화
       const url = URL.createObjectURL(file);
       
       // 비디오 wrapper 내부만 업데이트
@@ -999,9 +1004,23 @@
         // 실시간 밴드 미리보기
         const p = pairs.get(id); if(!p) return;
         const tMoved = leftToTime(nl);
-        if(role === 'start'){ p.start = Math.min(tMoved, p.end); }
-        else { p.end = Math.max(tMoved, p.start); }
+        if(role === 'start'){ 
+          p.start = Math.min(tMoved, p.end);
+          // 챕터 메타데이터도 업데이트
+          if(p.meta && p.meta.chapter) {
+            p.meta.chapter.start = p.start;
+          }
+        }
+        else { 
+          p.end = Math.max(tMoved, p.start);
+          // 챕터 메타데이터도 업데이트
+          if(p.meta && p.meta.chapter) {
+            p.meta.chapter.end = p.end;
+          }
+        }
         positionPair(id);
+        // 챕터 카드 실시간 업데이트
+        updateChapterCard(id);
       };
       const up = async ()=>{
         if(!dragging) return; dragging = false;
@@ -1164,7 +1183,11 @@
         sum.className = 'chapter-summary';
         sum.textContent = ch.summary || '';
 
-        // 편집 버튼 추가
+        // 컨트롤 버튼 컨테이너
+        const controls = document.createElement('div');
+        controls.className = 'chapter-controls';
+        
+        // 편집 버튼
         const editBtn = document.createElement('button');
         editBtn.className = 'chapter-edit';
         editBtn.textContent = '편집';
@@ -1172,11 +1195,23 @@
           e.stopPropagation();
           openEditModal(Number(card.dataset.pairId), ch);
         });
+        
+        // 삭제 버튼
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'chapter-delete';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteChapter(Number(card.dataset.pairId));
+        });
+        
+        controls.appendChild(editBtn);
+        controls.appendChild(deleteBtn);
 
         card.appendChild(title); 
         card.appendChild(tm); 
         card.appendChild(sum);
-        card.appendChild(editBtn);
+        card.appendChild(controls);
 
         card.addEventListener('click', ()=>{
           const pid = Number(card.dataset.pairId);
@@ -1297,18 +1332,8 @@
         return;
       }
       
-      // 서버 영상인 경우 (currentVideoFile이 없는 경우)
-      if (!currentVideoFile) {
-        console.log('⚠️ 서버 영상 - 구간 재생 기능 제한');
-        // 영상 시작 시점으로 이동만 함
-        if (videoEl) {
-          videoEl.currentTime = p.start;
-          statusEl.textContent = `${(p.meta?.index ?? 0) + 1}. ${p.meta?.chapter?.title} (${p.start.toFixed(1)}s ~ ${p.end.toFixed(1)}s)`;
-        }
-        return;
-      }
-      
       console.log(`챕터 정보: start=${p.start}, end=${p.end}, title=${p.meta?.chapter?.title}`);
+      console.log(`currentVideoFile: ${currentVideoFile ? '있음' : '없음'}, currentStoredName: ${currentStoredName}`);
       
       const title = p.meta?.chapter?.title || `챕터 ${(p.meta?.index ?? 0) + 1}`;
       
@@ -1318,11 +1343,25 @@
         
         // Flask로 구간 영상 요청
         const fd = new FormData();
-        fd.append('file', currentVideoFile);
+        
+        // 파일 소스 결정: 로컬 파일 vs 서버 영상
+        if (currentVideoFile) {
+          // 로컬 파일 업로드
+          fd.append('file', currentVideoFile);
+          console.log(`Flask에 구간 영상 요청 (로컬 파일): start=${p.start}, end=${p.end}`);
+        } else if (currentStoredName) {
+          // 서버 영상: Spring을 통해 파일 스트리밍
+          const videoResponse = await fetch(`/api/videos/stream/${currentStoredName}`);
+          if (!videoResponse.ok) throw new Error('서버 영상 로드 실패');
+          const videoBlob = await videoResponse.blob();
+          fd.append('file', videoBlob, currentStoredName);
+          console.log(`Flask에 구간 영상 요청 (서버 영상): storedName=${currentStoredName}, start=${p.start}, end=${p.end}`);
+        } else {
+          throw new Error('영상 파일을 찾을 수 없습니다.');
+        }
+        
         fd.append('start', p.start);
         fd.append('end', p.end);
-        
-        console.log(`Flask에 구간 영상 요청: start=${p.start}, end=${p.end}`);
         
         const res = await fetch('http://localhost:5001/clip', {
           method: 'POST',
@@ -1398,10 +1437,11 @@
       console.log('모든 마커 제거 완료');
       
       // 원본 영상 다시 로드
+      const videoWrapper = document.getElementById('video-wrapper');
+      videoWrapper.innerHTML = '';
+      
       if (currentVideoFile) {
-        const videoWrapper = document.getElementById('video-wrapper');
-        videoWrapper.innerHTML = '';
-        
+        // 로컬 파일인 경우
         const url = URL.createObjectURL(currentVideoFile);
         videoEl = document.createElement('video');
         videoEl.src = url;
@@ -1413,7 +1453,22 @@
         
         videoEl.addEventListener('loadedmetadata', () => {
           duration = videoEl.duration || 0;
-          console.log('원본 영상 다시 로드 완료');
+          console.log('원본 영상 다시 로드 완료 (로컬 파일)');
+        }, { once: true });
+      } else if (currentStoredName) {
+        // 서버 영상인 경우
+        const videoUrl = `/api/videos/stream/${currentStoredName}`;
+        videoEl = document.createElement('video');
+        videoEl.src = videoUrl;
+        videoEl.controls = true;
+        videoEl.style.maxHeight = '100%';
+        videoEl.style.maxWidth = '100%';
+        videoEl.style.objectFit = 'contain';
+        videoWrapper.appendChild(videoEl);
+        
+        videoEl.addEventListener('loadedmetadata', () => {
+          duration = videoEl.duration || 0;
+          console.log('원본 영상 다시 로드 완료 (서버 영상)');
         }, { once: true });
       }
       
@@ -1567,6 +1622,8 @@
       p.end = newEnd;
       p.meta.chapter.title = newTitle;
       p.meta.chapter.summary = newSummary;
+      p.meta.chapter.start = newStart;
+      p.meta.chapter.end = newEnd;
       
       // UI 업데이트
       positionPair(editingChapterId);
@@ -1574,6 +1631,46 @@
       
       // 모달 닫기
       closeEditModal();
+    }
+    
+    function deleteChapter(pairId) {
+      const p = pairs.get(pairId);
+      if (!p) return;
+      
+      const chapterTitle = p.meta?.chapter?.title || '이 챕터';
+      if (!confirm(`"${chapterTitle}"를 삭제하시겠습니까?\n(저장하기 전까지는 DB에 반영되지 않습니다)`)) {
+        return;
+      }
+      
+      console.log(`챕터 삭제: pairId=${pairId}`);
+      
+      // 마커와 밴드 제거
+      if (p.markersCreated) {
+        if (p.startMarker) p.startMarker.remove();
+        if (p.endMarker) p.endMarker.remove();
+        if (p.band) p.band.remove();
+      }
+      
+      // 썸네일을 빈 상자로 변경
+      if (p.thumb) {
+        p.thumb.className = 'timeline-item empty';
+        p.thumb.dataset.filled = 'false';
+        p.thumb.dataset.id = '';
+        p.thumb.innerHTML = '';
+      }
+      
+      // pairs에서 제거
+      pairs.delete(pairId);
+      
+      // 활성 상태 해제
+      if (activeId === pairId) {
+        activeId = null;
+      }
+      
+      // 챕터 카드 목록 업데이트
+      updateChaptersList();
+      
+      console.log(`챕터 삭제 완료: ${chapterTitle}`);
     }
     
     function updateChapterCard(pairId) {
@@ -1628,7 +1725,8 @@
     
     /* ===== 저장 기능 ===== */
     btnSave.addEventListener('click', () => {
-      if (!currentVideoFile) {
+      // 영상이 로드되어 있는지 확인 (로컬 파일 또는 서버 영상)
+      if (!currentVideoFile && !currentStoredName) {
         alert('저장할 영상이 없습니다. 먼저 영상을 불러와 주세요.');
         return;
       }
@@ -1720,11 +1818,12 @@
       
       console.log('현재 상태 확인:');
       console.log('  - currentVideoFile:', currentVideoFile);
+      console.log('  - currentStoredName:', currentStoredName);
       console.log('  - duration:', duration);
       console.log('  - pairs.size:', pairs.size);
       
       try {
-        statusEl.textContent = '영상 저장 중...';
+        statusEl.textContent = currentStoredName ? '영상 업데이트 중...' : '영상 저장 중...';
         btnSave.disabled = true;
         
         // 실제 화면의 챕터 데이터 수집 (분석된 것 + 수동 생성/편집된 것)
@@ -1743,7 +1842,23 @@
         
         // FormData 생성
         const formData = new FormData();
-        formData.append('file', currentVideoFile);
+        
+        // 업데이트 모드 vs 신규 저장 모드
+        if (currentStoredName) {
+          // 업데이트 모드: 파일 전송 안함, storedName 전송
+          console.log('🔄 업데이트 모드: 기존 파일 유지, userName과 챕터만 업데이트');
+          formData.append('storedName', currentStoredName);
+        } else {
+          // 신규 저장 모드: 파일 전송
+          if (!currentVideoFile) {
+            alert('저장할 영상 파일이 없습니다.');
+            btnSave.disabled = false;
+            return;
+          }
+          console.log('💾 신규 저장 모드: 새 파일 업로드');
+          formData.append('file', currentVideoFile);
+        }
+        
         formData.append('userName', userName);
         formData.append('duration', duration);
         
@@ -1751,7 +1866,8 @@
         formData.append('chapters', chaptersJson);
         
         console.log('📤 서버로 전송:');
-        console.log('  - 파일명:', currentVideoFile.name);
+        console.log('  - 파일명:', currentVideoFile ? currentVideoFile.name : '없음 (업데이트)');
+        console.log('  - storedName:', currentStoredName || '없음 (신규)');
         console.log('  - 사용자 이름:', userName);
         console.log('  - 영상 길이:', duration, '초');
         console.log('  - 챕터 수:', chaptersData.length);
@@ -1778,17 +1894,21 @@
         }
         
         const result = await response.json();
-        console.log('✅ 저장 성공:', result);
+        console.log('✅ 저장/업데이트 성공:', result);
         
-        statusEl.textContent = `저장 완료: ${result.storedName}`;
-        alert(`영상이 성공적으로 저장되었습니다!\n파일명: ${result.storedName}\n챕터 수: ${chaptersData.length}개`);
+        // storedName 업데이트 (신규 저장인 경우)
+        if (!currentStoredName && result.storedName) {
+          currentStoredName = result.storedName;
+          console.log('📌 currentStoredName 설정:', currentStoredName);
+        }
+        
+        statusEl.textContent = `완료: ${result.storedName}`;
+        alert(`영상이 성공적으로 ${currentStoredName ? '업데이트' : '저장'}되었습니다!\n파일명: ${result.storedName}\n챕터 수: ${chaptersData.length}개`);
         closeSaveModal();
         
         // 사이드바 목록 갱신
-        if (allVideos.length > 0) {
-          await loadVideoList();
-          console.log('📋 사이드바 목록 갱신 완료');
-        }
+        await loadVideoList();
+        console.log('📋 사이드바 목록 갱신 완료');
         
       } catch (error) {
         console.error('❌ 저장 오류:', error);
@@ -1998,8 +2118,9 @@
           }, { once: true });
         });
         
-        // currentVideoFile은 서버 영상용 더미 File 객체 생성 (구간 재생용)
-        currentVideoFile = null; // 서버 영상은 currentVideoFile 없이 동작
+        // 서버 영상 정보 저장
+        currentVideoFile = null; // 서버 영상은 로컬 파일 없음
+        currentStoredName = storedName; // 업데이트용 storedName 저장
         
         // 타임라인 초기화
         resetTimeline();

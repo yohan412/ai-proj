@@ -90,6 +90,41 @@ public class VideoService {
     }
     
     @Transactional
+    public Video updateVideo(String storedName, SaveVideoRequest request) {
+        // 기존 영상 조회
+        Video video = videoRepository.findByStoredName(storedName)
+                .orElseThrow(() -> new RuntimeException("영상을 찾을 수 없습니다: " + storedName));
+        
+        // userName만 업데이트 (storedName과 파일은 변경하지 않음)
+        video.setUserName(request.getUserName());
+        
+        // duration 업데이트 (필요시)
+        if (request.getDuration() != null) {
+            video.setDuration(request.getDuration());
+        }
+        
+        video = videoRepository.save(video);
+        
+        // 기존 챕터들 모두 삭제
+        chapterRepository.deleteByStoredName(storedName);
+        
+        // 새 챕터들 저장
+        if (request.getChapters() != null && !request.getChapters().isEmpty()) {
+            for (SaveVideoRequest.ChapterData chapterData : request.getChapters()) {
+                VideoChapter chapter = new VideoChapter();
+                chapter.setStoredName(storedName);
+                chapter.setStartTime(chapterData.getStart());
+                chapter.setEndTime(chapterData.getEnd());
+                chapter.setTitle(chapterData.getTitle());
+                chapter.setSummary(chapterData.getSummary());
+                chapterRepository.save(chapter);
+            }
+        }
+        
+        return video;
+    }
+    
+    @Transactional
     public void deleteVideo(Long videoId) {
         Video video = videoRepository.findById(videoId)
                 .orElseThrow(() -> new RuntimeException("영상을 찾을 수 없습니다: " + videoId));
