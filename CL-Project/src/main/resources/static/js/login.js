@@ -160,42 +160,34 @@ async function handleLogout() {
  * 로그인 상태일 때 메뉴 업데이트
  */
 function updateMenuForLoggedIn(user) {
-    const menu = document.getElementById('menu');
-    if (!menu) return;
+    const menuSignup = document.getElementById('menu-signup');
+    const menuLogin = document.getElementById('menu-login');
+    const menuUserInfo = document.getElementById('menu-user-info');
+    const menuLogout = document.getElementById('menu-logout');
+    const menuUsername = document.getElementById('menu-username');
     
-    const menuList = menu.querySelector('ul');
-    if (!menuList) return;
+    if (menuSignup) menuSignup.style.display = 'none';
+    if (menuLogin) menuLogin.style.display = 'none';
+    if (menuUserInfo) menuUserInfo.style.display = 'block';
+    if (menuLogout) menuLogout.style.display = 'block';
+    if (menuUsername) menuUsername.textContent = user.name || user.username;
     
-    // 기존 Sign Up, LogIn 제거하고 사용자 정보 추가
-    menuList.innerHTML = `
-        <li><a href="/">Home</a></li>
-        <li><a href="/manage">generic</a></li>
-        <li><a href="/content">Content</a></li>
-        <li><a href="#" class="user-info" style="pointer-events: none; opacity: 0.7;">${user.name}님</a></li>
-        <li><a href="#" class="logout-link" onclick="handleLogout(); return false;">Logout</a></li>
-    `;
-    
-    console.log('메뉴 업데이트: 로그인 상태');
+    console.log('메뉴 업데이트: 로그인 상태 -', user.name);
 }
 
 /**
  * 비로그인 상태일 때 메뉴 업데이트
  */
 function updateMenuForGuest() {
-    const menu = document.getElementById('menu');
-    if (!menu) return;
+    const menuSignup = document.getElementById('menu-signup');
+    const menuLogin = document.getElementById('menu-login');
+    const menuUserInfo = document.getElementById('menu-user-info');
+    const menuLogout = document.getElementById('menu-logout');
     
-    const menuList = menu.querySelector('ul');
-    if (!menuList) return;
-    
-    // Sign Up, LogIn 표시
-    menuList.innerHTML = `
-        <li><a href="/">Home</a></li>
-        <li><a href="/manage">generic</a></li>
-        <li><a href="/content">Content</a></li>
-        <li><a href="#" class="login-link" onclick="toggleSignupPopup(); return false;">Sign Up</a></li>
-        <li><a href="#" class="login-link" onclick="toggleLoginPopup(); return false;">LogIn</a></li>
-    `;
+    if (menuSignup) menuSignup.style.display = 'block';
+    if (menuLogin) menuLogin.style.display = 'block';
+    if (menuUserInfo) menuUserInfo.style.display = 'none';
+    if (menuLogout) menuLogout.style.display = 'none';
     
     console.log('메뉴 업데이트: 비로그인 상태');
 }

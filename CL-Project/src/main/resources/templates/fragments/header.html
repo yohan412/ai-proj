@@ -6,12 +6,16 @@
 				<li class="special">
 					<a href="#menu" class="menuToggle"><span>Menu</span></a>
 					<div id="menu" data-header-loaded="true">
-						<ul>
+						<ul id="menu-items">
 							<li><a th:href="@{/}">Home</a></li>
 							<li><a th:href="@{/manage}">generic</a></li>
 				            <li><a th:href="@{/content}">Content</a></li>
-							<li><a href="#" class="login-link" onclick="toggleSignupPopup()">Sign Up</a></li>
-							<li><a href="#" class="login-link" onclick="toggleLoginPopup()">LogIn</a></li>
+							<!-- 비로그인 시 표시 -->
+							<li id="menu-signup" style="display:none;"><a href="#" onclick="toggleSignupPopup()">Sign Up</a></li>
+							<li id="menu-login" style="display:none;"><a href="#" onclick="toggleLoginPopup()">LogIn</a></li>
+							<!-- 로그인 시 표시 -->
+							<li id="menu-user-info" style="display:none;"><a href="#" style="pointer-events:none;"><span id="menu-username"></span>님</a></li>
+							<li id="menu-logout" style="display:none;"><a href="#" onclick="handleLogout()">LogOut</a></li>
 						</ul>
 					</div>
 				</li>

@@ -158,9 +158,12 @@ public class AuthController {
     
     /**
      * 로그아웃 API
-     * @param request HttpServletRequest
-     * @return 성공 메시지
+     * Spring Security의 기본 로그아웃 기능을 사용하므로 이 메서드는 호출되지 않음
+     * SecurityConfig에서 /api/auth/logout 경로를 Spring Security가 처리하도록 설정됨
+     * 
+     * @deprecated Spring Security의 로그아웃 필터가 처리
      */
+    /*
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request) {
         log.info("로그아웃 API 호출");
@@ -181,6 +184,7 @@ public class AuthController {
         log.info("로그아웃 성공");
         return ResponseEntity.ok(response);
     }
+    */
     
     /**
      * 현재 로그인 상태 확인 API

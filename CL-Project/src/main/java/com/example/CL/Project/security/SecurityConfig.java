@@ -23,6 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
     
     private final UserDetailsService userDetailsService;
+    private final CustomLogoutSuccessHandler customLogoutSuccessHandler;
     
     /**
      * 비밀번호 암호화를 위한 BCryptPasswordEncoder Bean
@@ -111,10 +112,10 @@ public class SecurityConfig {
             // HTTP Basic 인증 비활성화
             .httpBasic(basic -> basic.disable())
             
-            // 로그아웃 설정
+            // 로그아웃 설정 - 커스텀 핸들러 사용
             .logout(logout -> logout
                 .logoutUrl("/api/auth/logout")
-                .logoutSuccessUrl("/")
+                .logoutSuccessHandler(customLogoutSuccessHandler)
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
                 .permitAll()

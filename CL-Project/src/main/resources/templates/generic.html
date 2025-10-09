@@ -528,11 +528,15 @@
         align-items:center;
         justify-content:center;
         z-index:999;
-        transition:all 0.3s;
+        transition:left 0.3s ease;
+        padding:0 6px;
     }
     .sidebar-toggle:hover{
         background:rgba(255,255,255,0.2);
-        width:28px;
+        padding:0 7px;
+    }
+    .sidebar-toggle.open{
+        left:360px;
     }
     
     .left-sidebar{
@@ -645,6 +649,8 @@
         padding:0;
         width:auto;
         height:auto;
+        outline:none;
+        box-shadow:none;
     }
     .video-list-item:hover .video-delete{
         display:block;
@@ -653,6 +659,8 @@
         color:#ff0000;
         transform:scale(1.2);
         text-shadow:0 0 8px rgba(255,0,0,0.6);
+        outline:none;
+        box-shadow:none;
     }
   </style>
 </head>
@@ -1816,6 +1824,7 @@
     // 사이드바 토글
     sidebarToggle.addEventListener('click', () => {
       const isOpen = leftSidebar.classList.toggle('open');
+      sidebarToggle.classList.toggle('open');
       sidebarToggle.textContent = isOpen ? '◀' : '▶';
       
       if (isOpen && allVideos.length === 0) {
