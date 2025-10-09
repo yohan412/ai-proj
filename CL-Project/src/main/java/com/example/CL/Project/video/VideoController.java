@@ -131,5 +131,24 @@ public class VideoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    
+    @GetMapping("/stream/{storedName}")
+    public ResponseEntity<?> streamVideo(@PathVariable String storedName) {
+        try {
+            System.out.println("🎬 영상 스트리밍 요청: " + storedName);
+            org.springframework.core.io.Resource resource = videoService.getVideoResource(storedName);
+            
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.parseMediaType("video/mp4"))
+                    .header("Content-Disposition", "inline; filename=\"" + storedName + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            System.err.println("❌ 영상 스트리밍 실패: " + e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
+    }
 }
 

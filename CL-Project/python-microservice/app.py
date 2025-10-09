@@ -13,8 +13,9 @@ if sys.platform == "win32":
     # 콘솔 출력을 UTF-8로 설정
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    # 환경변수 설정
+    # 환경변수 설정 - transformers 라이브러리 파일 읽기 오류 해결
     os.environ['PYTHONIOENCODING'] = 'utf-8'
+    os.environ['PYTHONUTF8'] = '1'  # Python 3.7+ UTF-8 모드 활성화
 
 # CUDA 라이브러리 경로 설정
 import nvidia.cublas

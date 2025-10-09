@@ -110,5 +110,22 @@ public class VideoService {
         // 파일명에서 특수문자 제거
         return filename.replaceAll("[^a-zA-Z0-9가-힣\\-_]", "_");
     }
+    
+    public org.springframework.core.io.Resource getVideoResource(String storedName) throws IOException {
+        Video video = videoRepository.findByStoredName(storedName)
+                .orElseThrow(() -> new RuntimeException("영상을 찾을 수 없습니다: " + storedName));
+        
+        Path filePath = Paths.get(video.getFilePath());
+        if (!Files.exists(filePath)) {
+            throw new IOException("영상 파일이 존재하지 않습니다: " + filePath);
+        }
+        
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+        if (resource.exists() && resource.isReadable()) {
+            return resource;
+        } else {
+            throw new IOException("영상 파일을 읽을 수 없습니다: " + filePath);
+        }
+    }
 }
 

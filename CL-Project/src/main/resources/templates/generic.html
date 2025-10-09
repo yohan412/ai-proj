@@ -507,6 +507,153 @@
     /* 2열 구조 항상 유지 - 최소 너비 보장 */
     body{ min-width:var(--min-shell); }
     .editor-shell{ grid-template-columns:minmax(700px,1fr) 560px !important; }
+    
+    /* ===== 왼쪽 사이드바 ===== */
+    .sidebar-toggle{
+        position:fixed;
+        left:0;
+        top:50%;
+        transform:translateY(-50%);
+        width:24px;
+        height:60px;
+        background:rgba(255,255,255,0.1);
+        border:1px solid rgba(255,255,255,0.2);
+        border-left:none;
+        border-radius:0 8px 8px 0;
+        backdrop-filter:blur(10px);
+        color:white;
+        font-size:16px;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:999;
+        transition:all 0.3s;
+    }
+    .sidebar-toggle:hover{
+        background:rgba(255,255,255,0.2);
+        width:28px;
+    }
+    
+    .left-sidebar{
+        position:fixed;
+        left:-360px;
+        top:64px;
+        width:360px;
+        height:calc(100vh - 64px);
+        background:rgba(46,56,66,0.95);
+        border-right:1px solid var(--line);
+        backdrop-filter:blur(20px);
+        z-index:998;
+        transition:left 0.3s ease;
+        display:flex;
+        flex-direction:column;
+        box-shadow:2px 0 20px rgba(0,0,0,0.3);
+    }
+    .left-sidebar.open{
+        left:0;
+    }
+    
+    .sidebar-header{
+        padding:16px;
+        border-bottom:1px solid var(--line);
+        background:rgba(0,0,0,0.2);
+    }
+    
+    .sidebar-search{
+        width:100%;
+        padding:10px 12px;
+        background:rgba(255,255,255,0.1);
+        border:1px solid rgba(255,255,255,0.2);
+        border-radius:6px;
+        color:white;
+        font-size:14px;
+    }
+    .sidebar-search::placeholder{
+        color:rgba(255,255,255,0.5);
+    }
+    .sidebar-search:focus{
+        outline:none;
+        background:rgba(255,255,255,0.15);
+        border-color:var(--accent);
+    }
+    
+    .sidebar-content{
+        flex:1;
+        overflow-y:auto;
+        padding:12px;
+    }
+    
+    .video-list-item{
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.1);
+        border-radius:8px;
+        padding:12px;
+        margin-bottom:12px;
+        cursor:pointer;
+        transition:all 0.2s;
+        position:relative;
+    }
+    .video-list-item:hover{
+        background:rgba(255,255,255,0.1);
+        border-color:var(--accent);
+    }
+    .video-list-item.active{
+        border-color:var(--accent);
+        box-shadow:0 0 0 2px var(--accent) inset;
+    }
+    
+    .video-thumb{
+        width:100%;
+        height:120px;
+        background:var(--panel-2);
+        border-radius:6px;
+        margin-bottom:8px;
+        object-fit:cover;
+    }
+    
+    .video-info{
+        font-size:13px;
+    }
+    .video-title{
+        font-weight:700;
+        color:white;
+        margin-bottom:4px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+    .video-meta{
+        font-size:11px;
+        color:var(--muted);
+    }
+    
+    .video-delete{
+        position:absolute;
+        top:8px;
+        right:8px;
+        background:transparent;
+        border:none;
+        color:#ff4d4d;
+        font-size:24px;
+        font-weight:bold;
+        cursor:pointer;
+        display:none;
+        transition:all 0.2s;
+        text-shadow:0 0 4px rgba(0,0,0,0.8);
+        line-height:1;
+        padding:0;
+        width:auto;
+        height:auto;
+    }
+    .video-list-item:hover .video-delete{
+        display:block;
+    }
+    .video-delete:hover{
+        color:#ff0000;
+        transform:scale(1.2);
+        text-shadow:0 0 8px rgba(255,0,0,0.6);
+    }
   </style>
 </head>
 <body class="generic-page">
@@ -514,6 +661,19 @@
   <div id="page-wrapper" data-header-loaded="true">
     <!-- Header Fragment -->
     <div th:replace="~{fragments/header :: header}"></div>
+  
+  <!-- 사이드바 토글 버튼 -->
+  <button class="sidebar-toggle" id="sidebar-toggle">▶</button>
+  
+  <!-- 왼쪽 사이드바 -->
+  <div class="left-sidebar" id="left-sidebar">
+    <div class="sidebar-header">
+      <input type="text" class="sidebar-search" id="video-search" placeholder="영상 검색...">
+    </div>
+    <div class="sidebar-content" id="video-list">
+      <!-- 영상 목록이 여기에 동적으로 추가됩니다 -->
+    </div>
+  </div>
   
   <!-- 좌측 비디오 업로드 input (좌측 프리뷰용) -->
   <input type="file" id="video-input" accept="video/*" hidden>
@@ -1128,8 +1288,15 @@
         console.error(`챕터 정보를 찾을 수 없음: pairId=${pairId}`);
         return;
       }
+      
+      // 서버 영상인 경우 (currentVideoFile이 없는 경우)
       if (!currentVideoFile) {
-        console.error('원본 영상 파일이 없습니다.');
+        console.log('⚠️ 서버 영상 - 구간 재생 기능 제한');
+        // 영상 시작 시점으로 이동만 함
+        if (videoEl) {
+          videoEl.currentTime = p.start;
+          statusEl.textContent = `${(p.meta?.index ?? 0) + 1}. ${p.meta?.chapter?.title} (${p.start.toFixed(1)}s ~ ${p.end.toFixed(1)}s)`;
+        }
         return;
       }
       
@@ -1609,6 +1776,12 @@
         alert(`영상이 성공적으로 저장되었습니다!\n파일명: ${result.storedName}\n챕터 수: ${chaptersData.length}개`);
         closeSaveModal();
         
+        // 사이드바 목록 갱신
+        if (allVideos.length > 0) {
+          await loadVideoList();
+          console.log('📋 사이드바 목록 갱신 완료');
+        }
+        
       } catch (error) {
         console.error('❌ 저장 오류:', error);
         console.error('오류 스택:', error.stack);
@@ -1632,10 +1805,256 @@
     /* ===== 보조 유틸 ===== */
     function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
     
+    /* ===== 왼쪽 사이드바 기능 ===== */
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const leftSidebar = document.getElementById('left-sidebar');
+    const videoListEl = document.getElementById('video-list');
+    const videoSearch = document.getElementById('video-search');
+    
+    let allVideos = []; // 전체 영상 목록
+    
+    // 사이드바 토글
+    sidebarToggle.addEventListener('click', () => {
+      const isOpen = leftSidebar.classList.toggle('open');
+      sidebarToggle.textContent = isOpen ? '◀' : '▶';
+      
+      if (isOpen && allVideos.length === 0) {
+        loadVideoList();
+      }
+    });
+    
+    // 영상 목록 로드
+    async function loadVideoList() {
+      try {
+        console.log('📋 영상 목록 로드 중...');
+        const response = await fetch('/api/videos');
+        if (!response.ok) throw new Error('목록 로드 실패');
+        
+        allVideos = await response.json();
+        console.log('✅ 영상 목록 로드 완료:', allVideos.length, '개');
+        
+        renderVideoList(allVideos);
+      } catch (error) {
+        console.error('❌ 목록 로드 실패:', error);
+        videoListEl.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">목록을 불러올 수 없습니다.</div>';
+      }
+    }
+    
+    // 영상 목록 렌더링
+    function renderVideoList(videos) {
+      if (videos.length === 0) {
+        videoListEl.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">저장된 영상이 없습니다.</div>';
+        return;
+      }
+      
+      videoListEl.innerHTML = '';
+      videos.forEach(video => {
+        const item = document.createElement('div');
+        item.className = 'video-list-item';
+        item.dataset.videoId = video.videoId;
+        item.dataset.storedName = video.storedName;
+        
+        // 썸네일 (실제로는 첫 프레임 캡처 필요 - 임시로 placeholder)
+        const thumb = document.createElement('div');
+        thumb.className = 'video-thumb';
+        thumb.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        thumb.style.display = 'flex';
+        thumb.style.alignItems = 'center';
+        thumb.style.justifyContent = 'center';
+        thumb.style.color = 'white';
+        thumb.style.fontSize = '12px';
+        thumb.textContent = '🎬';
+        
+        // 영상 정보
+        const info = document.createElement('div');
+        info.className = 'video-info';
+        
+        const title = document.createElement('div');
+        title.className = 'video-title';
+        title.textContent = video.userName;
+        
+        const meta = document.createElement('div');
+        meta.className = 'video-meta';
+        const duration = Math.floor(video.duration);
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        meta.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} • ${new Date(video.createdAt).toLocaleDateString('ko-KR')}`;
+        
+        info.appendChild(title);
+        info.appendChild(meta);
+        
+        // 삭제 버튼
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'video-delete';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteVideo(video.videoId, video.userName);
+        });
+        
+        item.appendChild(thumb);
+        item.appendChild(info);
+        item.appendChild(deleteBtn);
+        
+        // 클릭 이벤트 - 영상 로드
+        item.addEventListener('click', () => {
+          loadSavedVideo(video.storedName);
+        });
+        
+        videoListEl.appendChild(item);
+      });
+    }
+    
+    // 검색 기능
+    videoSearch.addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const filtered = allVideos.filter(v => 
+        v.userName.toLowerCase().includes(searchTerm) ||
+        v.storedName.toLowerCase().includes(searchTerm)
+      );
+      renderVideoList(filtered);
+    });
+    
+    // 영상 삭제
+    async function deleteVideo(videoId, videoName) {
+      if (!confirm(`"${videoName}" 영상을 삭제하시겠습니까?\n영상 파일과 모든 구간 정보가 삭제됩니다.`)) {
+        return;
+      }
+      
+      try {
+        console.log('🗑️ 영상 삭제 중:', videoId);
+        const response = await fetch(`/api/videos/${videoId}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || '삭제 실패');
+        }
+        
+        const result = await response.json();
+        console.log('✅ 삭제 완료:', result);
+        
+        // 목록 새로고침
+        await loadVideoList();
+        alert('영상이 삭제되었습니다.');
+        
+      } catch (error) {
+        console.error('❌ 삭제 실패:', error);
+        alert('영상 삭제 중 오류가 발생했습니다:\n' + error.message);
+      }
+    }
+    
+    // 저장된 영상 로드
+    async function loadSavedVideo(storedName) {
+      try {
+        console.log('📂 저장된 영상 로드:', storedName);
+        statusEl.textContent = '영상 로드 중...';
+        
+        // 영상 정보 및 챕터 정보 가져오기
+        const response = await fetch(`/api/videos/${storedName}`);
+        if (!response.ok) throw new Error('영상 정보 로드 실패');
+        
+        const data = await response.json();
+        console.log('✅ 영상 정보 로드:', data);
+        
+        const video = data.video;
+        const chapters = data.chapters;
+        
+        // 서버에서 영상 스트리밍
+        const videoUrl = `/api/videos/stream/${storedName}`;
+        console.log('🎬 영상 스트리밍 URL:', videoUrl);
+        
+        // 비디오 wrapper에 영상 표시
+        const videoWrapper = document.getElementById('video-wrapper');
+        videoWrapper.innerHTML = '';
+        
+        videoEl = document.createElement('video');
+        videoEl.src = videoUrl;
+        videoEl.controls = true;
+        videoEl.style.maxHeight = '100%';
+        videoEl.style.maxWidth = '100%';
+        videoEl.style.objectFit = 'contain';
+        videoWrapper.appendChild(videoEl);
+        
+        // 영상 메타데이터 로드 대기
+        await new Promise((resolve, reject) => {
+          videoEl.addEventListener('loadedmetadata', () => {
+            console.log('✅ 영상 메타데이터 로드 완료');
+            resolve();
+          }, { once: true });
+          videoEl.addEventListener('error', (e) => {
+            console.error('❌ 영상 로드 실패:', e);
+            reject(new Error('영상 파일 로드 실패'));
+          }, { once: true });
+        });
+        
+        // currentVideoFile은 서버 영상용 더미 File 객체 생성 (구간 재생용)
+        currentVideoFile = null; // 서버 영상은 currentVideoFile 없이 동작
+        
+        // 타임라인 초기화
+        resetTimeline();
+        duration = video.duration;
+        updateTimeLabel(0, duration);
+        
+        // 챕터 데이터 변환
+        const convertedChapters = chapters.map(ch => ({
+          start: ch.startTime,
+          end: ch.endTime,
+          title: ch.title,
+          summary: ch.summary
+        }));
+        
+        analyzedChapters = convertedChapters;
+        
+        // 썸네일 박스 생성
+        timeline.innerHTML = '';
+        for(let i=0; i<chapters.length; i++){
+          const box = document.createElement('div');
+          box.className = 'timeline-item';
+          box.dataset.filled = 'true';
+          timeline.appendChild(box);
+        }
+        ensureTrailingEmptyThumb();
+        
+        // 페어 생성 + 썸네일 캡처
+        const boxes = [...timeline.querySelectorAll('.timeline-item')].filter(el => el.dataset.filled === 'true');
+        const pairIds = [];
+        for(let i=0; i<convertedChapters.length; i++){
+          const ch = convertedChapters[i];
+          const box = boxes[i];
+          const id = createChapterPair(ch, box);
+          const p = pairs.get(id);
+          if(p) p.meta.index = i;
+          pairIds.push(id);
+          
+          // 챕터 시작 시점의 썸네일 캡처
+          await updateThumbFromTime(id, `${i+1}. ${ch.title || ''}`);
+        }
+        
+        // 우측 카드 렌더
+        renderChaptersList(convertedChapters, pairIds);
+        
+        // 사이드바의 활성 상태 업데이트
+        document.querySelectorAll('.video-list-item').forEach(el => el.classList.remove('active'));
+        const activeItem = document.querySelector(`[data-stored-name="${storedName}"]`);
+        if (activeItem) activeItem.classList.add('active');
+        
+        statusEl.textContent = `로드 완료: ${video.userName} (${chapters.length}개 챕터)`;
+        console.log('✅ 모든 로드 완료');
+        
+      } catch (error) {
+        console.error('❌ 영상 로드 실패:', error);
+        statusEl.textContent = '영상 로드 실패';
+        alert('영상 로드 중 오류가 발생했습니다:\n' + error.message);
+      }
+    }
+    
     /* ===== 초기화 ===== */
     console.log('✅ 페이지 스크립트 로드 완료');
     console.log('✅ 타임라인 이벤트 리스너 등록됨');
     console.log('✅ X 버튼 이벤트 리스너 등록됨');
+    console.log('✅ 사이드바 이벤트 리스너 등록됨');
     console.log('현재 설정:');
     console.log('  - videoEl:', videoEl);
     console.log('  - duration:', duration);
