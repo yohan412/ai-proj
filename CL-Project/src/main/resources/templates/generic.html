@@ -376,6 +376,134 @@
         background:rgba(255,255,255,0.2);
     }
     
+    /* 저장 이름 입력 모달 - 글래스모피즘 스타일 */
+    .save-modal{ 
+        position:fixed; 
+        top:0; 
+        left:0; 
+        width:100%; 
+        height:100%; 
+        background:rgba(0,0,0,0.4); 
+        backdrop-filter:blur(5px); 
+        -webkit-backdrop-filter:blur(5px); 
+        z-index:1000; 
+        display:none; 
+        align-items:center; 
+        justify-content:center; 
+    }
+    .save-modal.active{ display:flex; }
+    
+    .save-content{ 
+        position:relative;
+        width:450px;
+        padding:40px;
+        border-radius:24px;
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.2);
+        backdrop-filter:blur(25px);
+        -webkit-backdrop-filter:blur(25px);
+        box-shadow:
+            0 15px 35px rgba(0,0,0,0.3),
+            0 0 20px rgba(255,255,255,0.08),
+            inset 0 0 1px rgba(255,255,255,0.3),
+            inset 0 10px 20px rgba(255,255,255,0.05);
+        text-align:center;
+        color:#ffffff;
+    }
+    
+    .save-content h3{ 
+        font-size:32px;
+        font-weight:900;
+        letter-spacing:2px;
+        text-align:center;
+        color:#ffffff;
+        text-shadow:
+            0 1px 2px rgba(0,0,0,0.6),
+            0 2px 6px rgba(255,255,255,0.2);
+        margin:0 0 24px 0;
+    }
+    
+    .save-row{ 
+        display:flex; 
+        gap:12px; 
+        margin-bottom:16px; 
+        align-items:center; 
+    }
+    
+    .save-row label{ 
+        min-width:70px; 
+        font-size:13px; 
+        color:#c9d6e3; 
+        font-weight:500; 
+    }
+    
+    .save-row input{ 
+        flex:1;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        font-size:14px;
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s; 
+    }
+    
+    .save-row input::placeholder{
+        color:rgba(255,255,255,0.7);
+    }
+    
+    .save-row input:focus{ 
+        outline:none;
+        background:rgba(255,255,255,0.2);
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .save-buttons{ 
+        display:flex; 
+        gap:12px; 
+        justify-content:flex-end; 
+        margin-top:24px; 
+    }
+    
+    .save-btn{ 
+        margin:8px auto;
+        padding:10px 20px;
+        width:140px;
+        height:45px;
+        font-weight:bold;
+        font-size:15px;
+        border:none;
+        border-radius:12px;
+        background:rgba(255,255,255,0.15);
+        color:#ffffff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        box-shadow:
+            0 4px 10px rgba(0,0,0,0.4),
+            inset 0 1px 1px rgba(255,255,255,0.2);
+        backdrop-filter:blur(10px);
+        transition:all 0.2s ease;
+        cursor:pointer;
+    }
+    
+    .save-btn:hover{ 
+        background:rgba(255,255,255,0.25);
+        box-shadow:
+            0 6px 14px rgba(0,0,0,0.5),
+            inset 0 1px 2px rgba(255,255,255,0.3);
+    }
+    
+    .save-btn.cancel{ 
+        background:rgba(255,255,255,0.1);
+    }
+    
+    .save-btn.cancel:hover{ 
+        background:rgba(255,255,255,0.2);
+    }
+    
     /* 2열 구조 항상 유지 - 최소 너비 보장 */
     body{ min-width:var(--min-shell); }
     .editor-shell{ grid-template-columns:minmax(700px,1fr) 560px !important; }
@@ -421,6 +549,7 @@
         <div class="panel-header"><span>CHAPTERS</span></div>
         <div class="controls-row">
           <button id="btn-analyze" class="btn" type="button">자막·챕터 분석</button>
+          <button id="btn-save" class="btn" type="button" style="background:#28a745;">저장</button>
           <span class="status" id="status">좌측에서 영상을 불러온 뒤 분석을 실행하세요.</span>
         </div>
         <div id="chapters" class="chapters"></div>
@@ -482,6 +611,21 @@
     </div>
   </div>
 
+  <!-- 저장 이름 입력 모달 -->
+  <div class="save-modal" id="save-modal">
+    <div class="save-content">
+      <h3>영상 저장</h3>
+      <div class="save-row">
+        <label>저장 이름:</label>
+        <input type="text" id="save-name" placeholder="영상 이름을 입력하세요">
+      </div>
+      <div class="save-buttons">
+        <button class="save-btn save" id="confirm-save">확인</button>
+        <button class="save-btn cancel" id="cancel-save">취소</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // 즉시 실행 테스트
     console.log('🚀 스크립트 시작!');
@@ -494,6 +638,7 @@
     const timeLabelEnd = document.getElementById('time-label-end');
     const timeline = document.getElementById('timeline');
     const btnAnalyze = document.getElementById('btn-analyze');
+    const btnSave = document.getElementById('btn-save');
     const statusEl = document.getElementById('status');
     const chaptersWrap = document.getElementById('chapters');
 
@@ -504,6 +649,7 @@
     let activeId = null;
     let currentChapter = null; // 현재 재생 중인 챕터
     let editingChapterId = null; // 편집 중인 챕터 ID
+    let analyzedChapters = []; // 분석된 챕터 데이터 저장
     
     console.log('🔧 변수 초기화 완료');
 
@@ -923,6 +1069,9 @@
         const chapters = Array.isArray(data.chapters) ? data.chapters : [];
         console.log('Chapters received:', chapters);
         
+        // 분석된 챕터 데이터 저장
+        analyzedChapters = chapters;
+        
         if(chapters.length === 0) {
           statusEl.textContent = '경고: 생성된 챕터가 없습니다.';
           return;
@@ -1299,6 +1448,184 @@
     document.getElementById('create-modal').addEventListener('click', (e) => {
       if (e.target.id === 'create-modal') {
         closeCreateModal();
+      }
+    });
+    
+    /* ===== 저장 기능 ===== */
+    btnSave.addEventListener('click', () => {
+      if (!currentVideoFile) {
+        alert('저장할 영상이 없습니다. 먼저 영상을 불러와 주세요.');
+        return;
+      }
+      
+      // 실제 챕터 카드가 있는지 확인 (분석했거나 수동으로 만든 구간)
+      const chapterCards = document.querySelectorAll('.chapter-card');
+      if (chapterCards.length === 0) {
+        alert('저장할 챕터가 없습니다. 분석을 실행하거나 수동으로 구간을 생성해 주세요.');
+        return;
+      }
+      
+      openSaveModal();
+    });
+    
+    function openSaveModal() {
+      const modal = document.getElementById('save-modal');
+      document.getElementById('save-name').value = '';
+      modal.classList.add('active');
+    }
+    
+    function closeSaveModal() {
+      document.getElementById('save-modal').classList.remove('active');
+    }
+    
+    // 실제 화면의 챕터 데이터를 수집하는 함수
+    function collectChaptersFromDOM() {
+      const chaptersData = [];
+      
+      // pairs Map에서 챕터 정보 수집 (실제 화면에 표시된 구간들)
+      pairs.forEach((pair, id) => {
+        if (pair.meta && pair.meta.chapter) {
+          const chapter = pair.meta.chapter;
+          chaptersData.push({
+            start: pair.start,  // 실제 마커 위치 (사용자가 편집했을 수 있음)
+            end: pair.end,
+            title: chapter.title || '제목 없음',
+            summary: chapter.summary || ''
+          });
+        }
+      });
+      
+      // pairs가 비어있다면 DOM에서 직접 읽기 (fallback)
+      if (chaptersData.length === 0) {
+        const chapterCards = document.querySelectorAll('.chapter-card');
+        chapterCards.forEach(card => {
+          const titleEl = card.querySelector('.chapter-title');
+          const timeEl = card.querySelector('.chapter-time');
+          const summaryEl = card.querySelector('.chapter-summary');
+          
+          if (titleEl && timeEl) {
+            // 시간 텍스트에서 시작/종료 시간 추출 (예: "00:00:10,500 → 00:02:30,000")
+            const timeText = timeEl.textContent;
+            const timeMatch = timeText.match(/(\d+):(\d+):(\d+),(\d+)\s*→\s*(\d+):(\d+):(\d+),(\d+)/);
+            
+            if (timeMatch) {
+              const startTime = parseInt(timeMatch[1]) * 3600 + parseInt(timeMatch[2]) * 60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4]) / 1000;
+              const endTime = parseInt(timeMatch[5]) * 3600 + parseInt(timeMatch[6]) * 60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8]) / 1000;
+              
+              // 제목에서 번호 제거 (예: "1. Introduction" → "Introduction")
+              const titleText = titleEl.textContent.replace(/^\d+\.\s*/, '');
+              
+              chaptersData.push({
+                start: startTime,
+                end: endTime,
+                title: titleText || '제목 없음',
+                summary: summaryEl ? summaryEl.textContent : ''
+              });
+            }
+          }
+        });
+      }
+      
+      // 시작 시간 순으로 정렬
+      chaptersData.sort((a, b) => a.start - b.start);
+      
+      return chaptersData;
+    }
+    
+    async function saveVideoToServer() {
+      console.log('🔵 saveVideoToServer 호출됨');
+      
+      const userName = document.getElementById('save-name').value.trim();
+      console.log('입력된 이름:', userName);
+      
+      if (!userName) {
+        alert('저장 이름을 입력해주세요.');
+        return;
+      }
+      
+      console.log('현재 상태 확인:');
+      console.log('  - currentVideoFile:', currentVideoFile);
+      console.log('  - duration:', duration);
+      console.log('  - pairs.size:', pairs.size);
+      
+      try {
+        statusEl.textContent = '영상 저장 중...';
+        btnSave.disabled = true;
+        
+        // 실제 화면의 챕터 데이터 수집 (분석된 것 + 수동 생성/편집된 것)
+        const chaptersData = collectChaptersFromDOM();
+        
+        if (chaptersData.length === 0) {
+          alert('저장할 챕터가 없습니다.');
+          return;
+        }
+        
+        console.log('📊 수집된 챕터 데이터:');
+        console.log('  - 총 챕터 수:', chaptersData.length);
+        chaptersData.forEach((ch, idx) => {
+          console.log(`  ${idx + 1}. ${ch.title} (${ch.start.toFixed(1)}s - ${ch.end.toFixed(1)}s)`);
+        });
+        
+        // FormData 생성
+        const formData = new FormData();
+        formData.append('file', currentVideoFile);
+        formData.append('userName', userName);
+        formData.append('duration', duration);
+        
+        const chaptersJson = JSON.stringify(chaptersData);
+        formData.append('chapters', chaptersJson);
+        
+        console.log('📤 서버로 전송:');
+        console.log('  - 파일명:', currentVideoFile.name);
+        console.log('  - 사용자 이름:', userName);
+        console.log('  - 영상 길이:', duration, '초');
+        console.log('  - 챕터 수:', chaptersData.length);
+        console.log('  - 챕터 JSON:', chaptersJson);
+        
+        // 서버로 전송
+        console.log('🌐 Fetch 시작: /api/videos/save');
+        const response = await fetch('/api/videos/save', {
+          method: 'POST',
+          body: formData
+        });
+        
+        console.log('📥 응답 상태:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ 서버 오류 응답:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || '저장 실패');
+          } catch (e) {
+            throw new Error(`서버 오류 (${response.status}): ${errorText}`);
+          }
+        }
+        
+        const result = await response.json();
+        console.log('✅ 저장 성공:', result);
+        
+        statusEl.textContent = `저장 완료: ${result.storedName}`;
+        alert(`영상이 성공적으로 저장되었습니다!\n파일명: ${result.storedName}\n챕터 수: ${chaptersData.length}개`);
+        closeSaveModal();
+        
+      } catch (error) {
+        console.error('❌ 저장 오류:', error);
+        console.error('오류 스택:', error.stack);
+        statusEl.textContent = '저장 실패';
+        alert('영상 저장 중 오류가 발생했습니다:\n' + error.message);
+      } finally {
+        btnSave.disabled = false;
+      }
+    }
+    
+    // 저장 모달 이벤트
+    document.getElementById('confirm-save').addEventListener('click', saveVideoToServer);
+    document.getElementById('cancel-save').addEventListener('click', closeSaveModal);
+    
+    document.getElementById('save-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'save-modal') {
+        closeSaveModal();
       }
     });
 

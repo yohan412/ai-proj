@@ -95,6 +95,9 @@ public class SecurityConfig {
                 // Flask 연동 API 허용 (임시)
                 .requestMatchers("/api/analyze").permitAll()
                 
+                // 영상 관리 API 허용 (임시)
+                .requestMatchers("/api/videos/**").permitAll()
+                
                 // 영상 편집 페이지는 인증 필요 (나중에 활성화)
                 .requestMatchers("/manage", "/generic").permitAll()  // 임시로 허용
                 

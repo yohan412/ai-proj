@@ -83,6 +83,101 @@ COMMIT;
 */
 
 -- =========================================
+-- 영상 관리 테이블 스키마
+-- =========================================
+
+-- 기존 시퀀스 삭제 (있는 경우)
+DROP SEQUENCE VIDEO_SEQ;
+DROP SEQUENCE CHAPTER_SEQ;
+
+-- 기존 테이블 삭제 (있는 경우)
+DROP TABLE VIDEO_CHAPTERS CASCADE CONSTRAINTS;
+DROP TABLE VIDEOS CASCADE CONSTRAINTS;
+
+-- =========================================
+-- 영상 시퀀스 생성 (PK 자동 증가용)
+-- =========================================
+CREATE SEQUENCE VIDEO_SEQ
+    START WITH 1
+    INCREMENT BY 1
+    NOCACHE
+    NOCYCLE;
+
+-- =========================================
+-- 챕터 시퀀스 생성 (PK 자동 증가용)
+-- =========================================
+CREATE SEQUENCE CHAPTER_SEQ
+    START WITH 1
+    INCREMENT BY 1
+    NOCACHE
+    NOCYCLE;
+
+-- =========================================
+-- 영상 테이블 생성
+-- =========================================
+CREATE TABLE VIDEOS (
+    VIDEO_ID        NUMBER(19)      NOT NULL,
+    STORED_NAME     VARCHAR2(500)   NOT NULL,
+    USER_NAME       VARCHAR2(200)   NOT NULL,
+    FILE_PATH       VARCHAR2(1000)  NOT NULL,
+    DURATION        NUMBER(10,2)    DEFAULT 0 NOT NULL,
+    CREATED_AT      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UPDATED_AT      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    
+    -- 제약 조건
+    CONSTRAINT PK_VIDEOS PRIMARY KEY (VIDEO_ID),
+    CONSTRAINT UK_STORED_NAME UNIQUE (STORED_NAME)
+);
+
+-- =========================================
+-- 영상 구간(챕터) 테이블 생성
+-- =========================================
+CREATE TABLE VIDEO_CHAPTERS (
+    CHAPTER_ID      NUMBER(19)      NOT NULL,
+    STORED_NAME     VARCHAR2(500)   NOT NULL,
+    START_TIME      NUMBER(10,2)    NOT NULL,
+    END_TIME        NUMBER(10,2)    NOT NULL,
+    TITLE           VARCHAR2(500)   NOT NULL,
+    SUMMARY         VARCHAR2(2000),
+    CREATED_AT      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UPDATED_AT      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    
+    -- 제약 조건
+    CONSTRAINT PK_VIDEO_CHAPTERS PRIMARY KEY (CHAPTER_ID)
+);
+
+-- =========================================
+-- 인덱스 생성 (성능 최적화)
+-- =========================================
+CREATE INDEX IDX_VIDEO_STORED_NAME ON VIDEOS(STORED_NAME);
+CREATE INDEX IDX_VIDEO_USER_NAME ON VIDEOS(USER_NAME);
+CREATE INDEX IDX_VIDEO_CREATED_AT ON VIDEOS(CREATED_AT);
+CREATE INDEX IDX_CHAPTER_STORED_NAME ON VIDEO_CHAPTERS(STORED_NAME);
+CREATE INDEX IDX_CHAPTER_START_TIME ON VIDEO_CHAPTERS(START_TIME);
+
+-- =========================================
+-- 테이블 코멘트
+-- =========================================
+COMMENT ON TABLE VIDEOS IS '영상 정보 테이블';
+COMMENT ON COLUMN VIDEOS.VIDEO_ID IS '영상 순번 (Primary Key, 자동 증가)';
+COMMENT ON COLUMN VIDEOS.STORED_NAME IS '실제 저장된 파일명 (고유값)';
+COMMENT ON COLUMN VIDEOS.USER_NAME IS '사용자가 저장한 이름';
+COMMENT ON COLUMN VIDEOS.FILE_PATH IS '파일 저장 경로';
+COMMENT ON COLUMN VIDEOS.DURATION IS '영상 길이(초)';
+COMMENT ON COLUMN VIDEOS.CREATED_AT IS '등록일시';
+COMMENT ON COLUMN VIDEOS.UPDATED_AT IS '수정일시';
+
+COMMENT ON TABLE VIDEO_CHAPTERS IS '영상 구간(챕터) 정보 테이블';
+COMMENT ON COLUMN VIDEO_CHAPTERS.CHAPTER_ID IS '구간 순번 (Primary Key, 자동 증가)';
+COMMENT ON COLUMN VIDEO_CHAPTERS.STORED_NAME IS '영상 파일명 (참조용)';
+COMMENT ON COLUMN VIDEO_CHAPTERS.START_TIME IS '구간 시작 시점(초)';
+COMMENT ON COLUMN VIDEO_CHAPTERS.END_TIME IS '구간 종료 시점(초)';
+COMMENT ON COLUMN VIDEO_CHAPTERS.TITLE IS '구간 주제(제목)';
+COMMENT ON COLUMN VIDEO_CHAPTERS.SUMMARY IS '구간 요약';
+COMMENT ON COLUMN VIDEO_CHAPTERS.CREATED_AT IS '등록일시';
+COMMENT ON COLUMN VIDEO_CHAPTERS.UPDATED_AT IS '수정일시';
+
+-- =========================================
 -- 스키마 생성 완료
 -- =========================================
 
