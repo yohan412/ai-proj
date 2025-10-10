@@ -10,7 +10,6 @@ from transformers import BitsAndBytesConfig        # ★ NEW: BnB 4bit 설정 �
 from transformers import AutoConfig                # ★ NEW: 레포 config 로드 후 mxfp4 설정 제거
 
 from utils.helpers import round_time, ensure_json
-from services.translator import translate_text, translate_batch     # ★ NEW: 번역 기능 추가
 
 # Windows 한글 인코딩은 app.py에서 처리됨
 

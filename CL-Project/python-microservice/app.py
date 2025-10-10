@@ -24,8 +24,7 @@ os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
 
 from config import Settings
 from services.transcriber import transcribe_file
-from services.chapterizer import make_chapters_hf  # ← 로컬 HF 경로 사용
-from services.translator import translate_text     # ★ NEW: 번역 기능 추가
+from services.chapterizer import make_chapters_hf, _get_pipe, _extract_text, _lang_label_from_code  # ★ NEW: 추가 함수 import
 
 # (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
 # try:
@@ -278,7 +277,7 @@ def explain_chapter():
         segments = data.get("segments", [])
         start_time = float(data.get("start", 0))
         end_time = float(data.get("end", 0))
-        lang = data.get("lang", "ko")  # 기본값: 한국어
+        lang = data.get("lang", "ko")
         
         print(f"\n[상세 설명 요청]")
         print(f"  - 구간: {start_time}s ~ {end_time}s")
@@ -288,115 +287,41 @@ def explain_chapter():
         if not segments:
             return jsonify({"error": "no segments provided"}), 400
         
-        # 해당 구간의 세그먼트만 필터링
-        chapter_segments = []
-        for seg in segments:
-            seg_start = seg.get("start", 0)
-            seg_end = seg.get("end", 0)
-            # 세그먼트가 챕터 구간과 겹치는 경우
-            if seg_start < end_time and seg_end > start_time:
-                chapter_segments.append(seg)
+        # LLM 파이프라인 로드
+        pipe = _get_pipe(
+            model_id=cfg.HF_MODEL_ID,
+            load_in_4bit=cfg.HF_LOAD_IN_4BIT,
+            temperature=0.35,
+            max_new_tokens=400,
+            hf_token=cfg.HF_TOKEN,
+            max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
+            max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
+            offload_dir=cfg.HF_OFFLOAD_DIR,
+            low_cpu_mem=cfg.HF_LOW_CPU_MEM,
+            torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
+        )
         
-        print(f"  - 필터링된 세그먼트 수: {len(chapter_segments)}")
+        if pipe is None:
+            return jsonify({"error": "LLM pipeline initialization failed"}), 500
         
-        if not chapter_segments:
-            return jsonify({"explanation": "이 구간에 대한 자막이 없습니다."}), 200
+        # ★ explainer 모듈 사용
+        from services.explainer import generate_explanation
         
-        # 세그먼트 텍스트를 하나로 결합
-        transcript_text = " ".join([seg.get("text", "").strip() for seg in chapter_segments])
-        print(f"  - 자막 텍스트 길이: {len(transcript_text)}자")
-        print(f"  - 자막 텍스트 미리보기: {transcript_text[:100]}...")
-        
-        # Llama 3.2로 상세 설명 생성 (영어)
         print(f"\n[LLM 상세 설명 생성 시작]")
-        
-        explanation_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-You are an educational content analyzer. Your task is to provide a detailed explanation of the video segment based on the transcript.
-
-EXPLANATION RULES:
-- Provide 3-5 sentences explaining the key concepts and information
-- Focus on educational value and clarity
-- Use simple, clear language
-- Include important details and examples if mentioned
-- Write in ENGLISH only
-- Do NOT add irrelevant information
-- Do NOT include phrases like "Here is the explanation:" or similar
-
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Based on the following video transcript segment, provide a detailed explanation of what is being discussed:
-
-{transcript_text}
-
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-        
-        # LLM 파이프라인 사용하여 설명 생성 (translator와 동일한 설정)
-        try:
-            # chapterizer에서 사용하는 것과 동일한 파이프라인 활용
-            from services.chapterizer import _get_pipe, _extract_text
-            
-            pipe = _get_pipe(
-                model_id=cfg.HF_MODEL_ID,
-                load_in_4bit=cfg.HF_LOAD_IN_4BIT,
-                temperature=0.5,  # 약간 더 창의적인 설명
-                max_new_tokens=400,  # 충분한 길이
-                hf_token=cfg.HF_TOKEN,
-                max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
-                max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
-                offload_dir=cfg.HF_OFFLOAD_DIR,
-                low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-                torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
-            )
-            
-            if pipe is None:
-                return jsonify({"error": "LLM pipeline initialization failed"}), 500
-            
-            outputs = pipe(explanation_prompt)
-            explanation_en = _extract_text(outputs)
-            
-            print(f"[LLM 생성 완료]")
-            print(f"  - 영어 설명 (첫 100자): {explanation_en[:100]}...")
-            
-        except Exception as e:
-            print(f"[오류] LLM 설명 생성 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({"error": f"LLM generation failed: {str(e)}"}), 500
-        
-        # 영어 설명을 타겟 언어로 번역
-        print(f"\n[번역 시작] {lang}")
-        try:
-            explanation_translated = translate_text(
-                text=explanation_en,
-                target_lang=lang,
-                model_id=cfg.HF_MODEL_ID,
-                load_in_4bit=cfg.HF_LOAD_IN_4BIT,
-                temperature=0.3,
-                max_new_tokens=500,
-                hf_token=cfg.HF_TOKEN,
-                max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
-                max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
-                offload_dir=cfg.HF_OFFLOAD_DIR,
-                low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-                torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
-            )
-            
-            print(f"[번역 완료]")
-            print(f"  - 번역된 설명 (첫 100자): {explanation_translated[:100]}...")
-            
-        except Exception as e:
-            print(f"[경고] 번역 실패, 영어 원문 반환: {e}")
-            explanation_translated = explanation_en
+        explanation = generate_explanation(
+            segments=segments,
+            start_time=start_time,
+            end_time=end_time,
+            lang=lang,
+            pipe=pipe,
+            _extract_text=_extract_text
+        )
         
         print(f"\n[상세 설명 생성 완료]\n")
         
         return jsonify({
-            "explanation": explanation_translated,
-            "explanation_en": explanation_en,  # 디버깅용 영어 원문도 포함
-            "segment_count": len(chapter_segments)
+            "explanation": explanation,
+            "segment_count": len(segments)
         })
         
     except Exception as e:

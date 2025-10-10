@@ -543,6 +543,9 @@
     let currentDetectedLang = 'ko'; // ★ NEW: 감지된 언어
     let currentChapter = null; // 현재 재생 중인 구간
     let allVideos = []; // 전체 영상 목록
+    let explanationQueue = []; // ★ NEW: 설명 요청 큐
+    let isProcessingExplanation = false; // ★ NEW: 큐 처리 중 플래그
+    let hasUserStartedPlayback = false; // ★ NEW: 사용자가 재생을 시작했는지 여부
 
     /* ===== 유틸 함수 ===== */
     function formatTime(seconds) {
@@ -653,6 +656,9 @@
       try {
         console.log('📂 영상 로드:', storedName);
         
+        // ★ NEW: 플래그 초기화
+        hasUserStartedPlayback = false;
+        
         // 영상 정보 및 챕터 정보 가져오기
         const response = await fetch(`/api/videos/${storedName}`);
         if (!response.ok) throw new Error('영상 정보 로드 실패');
@@ -691,8 +697,17 @@
         duration = video.duration;
         updateTimeLabel(0, duration);
         
-        // ★ NEW: 영상 재생 중 현재 구간의 설명 자동 확장
+        // ★ NEW: 영상 재생 중 활성 챕터 추적 변수
         let lastActiveChapter = -1;
+        
+        // ★ NEW: 사용자가 재생 버튼을 누를 때 플래그 설정 및 챕터 리셋
+        videoEl.addEventListener('play', () => {
+          hasUserStartedPlayback = true;
+          lastActiveChapter = -1; // ★ 리셋하여 첫 챕터 재감지
+          console.log('▶️ 재생 시작 - 자동 로드 활성화 (lastActiveChapter 리셋)');
+        }, { once: true });
+        
+        // ★ NEW: 영상 재생 중 활성 챕터 UI 업데이트
         videoEl.addEventListener('timeupdate', () => {
           const currentTime = videoEl.currentTime;
           
@@ -705,10 +720,7 @@
           if (activeChapterIdx !== -1 && activeChapterIdx !== lastActiveChapter) {
             lastActiveChapter = activeChapterIdx;
             
-            // 해당 챕터의 상세 설명 자동 로드 및 확장
-            loadChapterExplanation(activeChapterIdx);
-            
-            // 챕터 카드 활성화 표시 및 스크롤
+            // ★ 활성 챕터 UI 업데이트 + 조건부 자동 설명 로드
             document.querySelectorAll('.chapter-card').forEach(card => {
               card.classList.remove('active');
             });
@@ -717,7 +729,17 @@
               activeCard.classList.add('active');
               // 활성 카드로 스크롤
               activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              
+              // ★ 사용자가 재생 버튼을 누른 후에만 자동 로드
+              if (hasUserStartedPlayback) {
+                const detailDiv = activeCard.querySelector('.chapter-detail');
+                if (detailDiv && detailDiv.dataset.loaded !== 'true' && detailDiv.dataset.loading !== 'true') {
+                  queueExplanationRequest(activeChapterIdx);
+                }
+              }
             }
+            
+            console.log(`🎯 활성 챕터: ${activeChapterIdx + 1}. ${currentChapters[activeChapterIdx].title}`);
           }
         });
         
@@ -757,6 +779,9 @@
         return;
       }
       
+      // ★ NEW: 현재 재생 시점 저장 (초기 로드 시 0초 유지용)
+      const originalTime = videoEl ? videoEl.currentTime : 0;
+      
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
         const item = document.createElement('div');
@@ -775,12 +800,18 @@
           item.innerHTML = `<div class="thumb-label">${i + 1}. ${ch.title}</div>`;
         }
         
-        // 클릭 이벤트 - 구간 재생
+        // 클릭 이벤트 - 시점 이동
         item.addEventListener('click', () => {
-          playChapter(i);
+          seekToTime(ch.start);
         });
         
         timeline.appendChild(item);
+      }
+      
+      // ★ NEW: 원래 시점으로 복귀 (초기 로드 시 0초)
+      if (videoEl) {
+        videoEl.currentTime = originalTime;
+        console.log('✅ 타임라인 렌더링 완료, 시점 복귀:', originalTime, '초');
       }
     }
 
@@ -904,6 +935,14 @@
       console.log('✅ 원본 영상 복귀 완료');
     }
 
+    /* ===== 시점 이동 함수 ===== */
+    function seekToTime(time) {
+      if (!videoEl || !duration) return;
+      
+      videoEl.currentTime = Math.max(0, Math.min(duration, time));
+      console.log(`⏩ 시점 이동: ${formatTime(time)}`);
+    }
+
     /* ===== 세그먼트 바 클릭 - 시점 이동 ===== */
     segmentBar.addEventListener('click', (e) => {
       if (!videoEl || !duration) return;
@@ -968,36 +1007,104 @@
         card.appendChild(summary);
         card.appendChild(detailDiv);
         
-        // 챕터 카드 클릭 → 상세 설명 확장/축소
+        // 챕터 카드 클릭 → 상세 설명 확장/축소 + 시점 이동
         card.addEventListener('click', async (e) => {
           const detailDiv = card.querySelector('.chapter-detail');
           
-          // 이미 로드된 경우 토글
+          // ★ NEW: 시점 이동 (설명 로드 전에 실행)
+          seekToTime(ch.start);
+          
+          // 이미 로드된 경우 토글만
           if (detailDiv.dataset.loaded === 'true') {
             const isActive = detailDiv.classList.toggle('active');
             card.classList.toggle('expanded', isActive);
+            console.log(`챕터 ${idx} 토글: ${isActive ? '확장' : '축소'}`);
             return;
           }
           
-          // 첫 클릭: 설명 로드
-          await loadChapterExplanation(idx);
-          card.classList.add('expanded');
+          // ★ 첫 클릭: 큐에 추가하여 설명 로드
+          console.log(`챕터 ${idx} 클릭 → 큐에 추가`);
+          await queueExplanationRequest(idx);
         });
         
         chaptersWrap.appendChild(card);
       });
     }
     
+    /* ===== 요청 큐 시스템 ===== */
+    async function queueExplanationRequest(chapterId) {
+      console.log(`📝 큐에 추가 요청: 챕터 ${chapterId}`);
+      
+      const card = document.querySelector(`[data-chapter-id="${chapterId}"]`);
+      const detailDiv = card?.querySelector('.chapter-detail');
+      
+      // 이미 로드된 경우 스킵
+      if (detailDiv?.dataset.loaded === 'true') {
+        console.log(`⚠️ 챕터 ${chapterId} 이미 로드됨`);
+        return;
+      }
+      
+      // 이미 큐에 있으면 추가 안 함
+      if (explanationQueue.includes(chapterId)) {
+        console.log(`⚠️ 이미 큐에 있음: 챕터 ${chapterId}`);
+        return;
+      }
+      
+      explanationQueue.push(chapterId);
+      console.log(`✅ 큐 추가 완료 (큐 크기: ${explanationQueue.length}개)`);
+      
+      // ★ 큐에 추가되자마자 즉시 로딩 표시
+      if (detailDiv && detailDiv.dataset.loading !== 'true') {
+        detailDiv.classList.add('active');
+        detailDiv.innerHTML = '<div class="spinner"></div><p>대기 중...</p>';
+        card?.classList.add('expanded');
+        console.log(`🔄 로딩 표시: 챕터 ${chapterId} (대기 중)`);
+      }
+      
+      if (!isProcessingExplanation) {
+        await processExplanationQueue();
+      }
+    }
+    
+    async function processExplanationQueue() {
+      if (explanationQueue.length === 0) {
+        isProcessingExplanation = false;
+        console.log('✅ 큐 처리 완료');
+        return;
+      }
+      
+      isProcessingExplanation = true;
+      const chapterId = explanationQueue.shift();
+      
+      console.log(`🔄 큐 처리 중: 챕터 ${chapterId} (남은 큐: ${explanationQueue.length}개)`);
+      
+      try {
+        await loadChapterExplanation(chapterId);
+      } catch (error) {
+        console.error(`❌ 큐 처리 중 오류: 챕터 ${chapterId}`, error);
+      }
+      
+      // 다음 요청 처리 (500ms 딜레이 - Flask 메모리 안정화)
+      setTimeout(() => processExplanationQueue(), 500);
+    }
+    
     /* ===== 챕터 상세 설명 로드 ===== */
     async function loadChapterExplanation(chapterId) {
       const card = document.querySelector(`[data-chapter-id="${chapterId}"]`);
-      if (!card) return;
+      if (!card) {
+        console.log(`⚠️ 챕터 ${chapterId} 카드를 찾을 수 없음`);
+        return;
+      }
       
       const detailDiv = card.querySelector('.chapter-detail');
-      if (!detailDiv) return;
+      if (!detailDiv) {
+        console.log(`⚠️ 챕터 ${chapterId} detailDiv를 찾을 수 없음`);
+        return;
+      }
       
-      // 이미 로드된 경우 단순히 확장만
+      // ★ 이미 로드된 경우 스킵
       if (detailDiv.dataset.loaded === 'true') {
+        console.log(`✅ 챕터 ${chapterId} 이미 로드됨, UI만 업데이트`);
         if (!detailDiv.classList.contains('active')) {
           detailDiv.classList.add('active');
           card.classList.add('expanded');
@@ -1005,19 +1112,32 @@
         return;
       }
       
-      const chapter = currentChapters[chapterId];
-      if (!chapter) return;
-      
-      // segments가 없으면 경고 (자동 확장에서는 조용히 리턴)
-      if (!currentSegments || currentSegments.length === 0) {
-        console.warn('자막 정보가 없어 상세 설명을 생성할 수 없습니다.');
+      // ★ 로딩 중인 경우 스킵
+      if (detailDiv.dataset.loading === 'true') {
+        console.log(`⚠️ 챕터 ${chapterId} 로딩 중, 스킵`);
         return;
       }
       
-      // 로딩 표시
+      const chapter = currentChapters[chapterId];
+      if (!chapter) {
+        console.log(`⚠️ 챕터 ${chapterId} 데이터를 찾을 수 없음`);
+        return;
+      }
+      
+      // segments가 없으면 경고
+      if (!currentSegments || currentSegments.length === 0) {
+        console.warn('⚠️ 자막 정보가 없어 상세 설명을 생성할 수 없습니다.');
+        return;
+      }
+      
+      // ★ 로딩 플래그 설정
+      detailDiv.dataset.loading = 'true';
+      
+      // 로딩 표시 업데이트 ("대기 중..." → "설명 생성 중...")
       detailDiv.classList.add('active', 'loading');
       card.classList.add('expanded');
       detailDiv.innerHTML = '<div class="spinner"></div><p>설명 생성 중...</p>';
+      console.log(`🔄 로딩 상태 업데이트: 챕터 ${chapterId} (설명 생성 중)`);
       
       try {
         console.log(`📘 챕터 ${chapterId + 1} 설명 로드 시작`);
@@ -1051,6 +1171,9 @@
         console.error('❌ 설명 로드 실패:', error);
         detailDiv.classList.remove('loading');
         detailDiv.innerHTML = '<p style="color:#ff7a59;">설명을 불러올 수 없습니다.</p>';
+      } finally {
+        // ★ 로딩 플래그 해제
+        detailDiv.dataset.loading = 'false';
       }
     }
     

@@ -95,6 +95,7 @@ public class SecurityConfig {
                 
                 // Flask 연동 API 허용 (임시)
                 .requestMatchers("/api/analyze").permitAll()
+                .requestMatchers("/api/explain").permitAll()  // ★ NEW: 챕터 설명 API
                 
                 // 영상 관리 API 허용 (임시)
                 .requestMatchers("/api/videos/**").permitAll()
