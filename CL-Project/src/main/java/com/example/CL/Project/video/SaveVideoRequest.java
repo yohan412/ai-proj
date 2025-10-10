@@ -6,6 +6,8 @@ public class SaveVideoRequest {
     private String userName;
     private Double duration;
     private List<ChapterData> chapters;
+    private String segments;  // JSON 형식의 자막 세그먼트
+    private String detectedLang;  // 감지된 언어
     
     public static class ChapterData {
         private Double start;
@@ -68,6 +70,22 @@ public class SaveVideoRequest {
     
     public void setChapters(List<ChapterData> chapters) {
         this.chapters = chapters;
+    }
+    
+    public String getSegments() {
+        return segments;
+    }
+    
+    public void setSegments(String segments) {
+        this.segments = segments;
+    }
+    
+    public String getDetectedLang() {
+        return detectedLang;
+    }
+    
+    public void setDetectedLang(String detectedLang) {
+        this.detectedLang = detectedLang;
     }
 }
 

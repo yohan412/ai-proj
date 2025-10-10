@@ -837,6 +837,8 @@
     let currentChapter = null; // 현재 재생 중인 챕터
     let editingChapterId = null; // 편집 중인 챕터 ID
     let analyzedChapters = []; // 분석된 챕터 데이터 저장
+    let analyzedSegments = []; // ★ NEW: 분석된 자막 세그먼트 저장
+    let detectedLang = 'ko'; // ★ NEW: 감지된 언어
     let currentStoredName = null; // 현재 로드된 영상의 storedName (업데이트용)
     
     console.log('🔧 변수 초기화 완료');
@@ -1288,8 +1290,13 @@
         const chapters = Array.isArray(data.chapters) ? data.chapters : [];
         console.log('Chapters received:', chapters);
         
-        // 분석된 챕터 데이터 저장
+        // ★ NEW: 분석된 데이터 저장 (챕터 + 자막 + 언어)
         analyzedChapters = chapters;
+        analyzedSegments = data.segments || [];
+        detectedLang = data.detected_lang || 'ko';
+        
+        console.log('✅ Segments 저장:', analyzedSegments.length, '개');
+        console.log('✅ 감지된 언어:', detectedLang);
         
         if(chapters.length === 0) {
           statusEl.textContent = '경고: 생성된 챕터가 없습니다.';
@@ -1881,12 +1888,26 @@
         const chaptersJson = JSON.stringify(chaptersData);
         formData.append('chapters', chaptersJson);
         
+        // ★ NEW: segments와 언어 정보 전송
+        if (analyzedSegments && analyzedSegments.length > 0) {
+          const segmentsJson = JSON.stringify(analyzedSegments);
+          formData.append('segments', segmentsJson);
+          console.log('✅ Segments 전송:', analyzedSegments.length, '개');
+        }
+        
+        if (detectedLang) {
+          formData.append('detectedLang', detectedLang);
+          console.log('✅ 언어 정보 전송:', detectedLang);
+        }
+        
         console.log('📤 서버로 전송:');
         console.log('  - 파일명:', currentVideoFile ? currentVideoFile.name : '없음 (업데이트)');
         console.log('  - storedName:', currentStoredName || '없음 (신규)');
         console.log('  - 사용자 이름:', userName);
         console.log('  - 영상 길이:', duration, '초');
         console.log('  - 챕터 수:', chaptersData.length);
+        console.log('  - Segments 수:', analyzedSegments.length);
+        console.log('  - 감지된 언어:', detectedLang);
         console.log('  - 챕터 JSON:', chaptersJson);
         
         // 서버로 전송

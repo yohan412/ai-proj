@@ -13,7 +13,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -90,6 +92,53 @@ public class AnalyzeController {
       return ResponseEntity.ok(out);
     } finally {
       try { Files.deleteIfExists(temp.toPath()); } catch (Exception ignore) {}
+    }
+  }
+
+  /**
+   * 챕터 구간에 대한 상세 설명 생성
+   * 요청 바디: { "segments": [...], "start": 10.5, "end": 20.3, "lang": "ko" }
+   * 응답: { "explanation": "...", "explanation_en": "..." }
+   */
+  @PostMapping(
+      value = "/explain",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE
+  )
+  public ResponseEntity<?> explain(@RequestBody Map<String, Object> requestBody) {
+    try {
+      System.out.println("📘 챕터 설명 생성 요청");
+      
+      // 요청 파라미터 추출
+      String segmentsJson = new com.fasterxml.jackson.databind.ObjectMapper()
+          .writeValueAsString(requestBody.get("segments"));
+      double start = ((Number) requestBody.getOrDefault("start", 0)).doubleValue();
+      double end = ((Number) requestBody.getOrDefault("end", 0)).doubleValue();
+      String lang = (String) requestBody.getOrDefault("lang", "ko");
+      
+      System.out.println("  - 구간: " + start + "s ~ " + end + "s");
+      System.out.println("  - 언어: " + lang);
+      
+      // Flask로 요청 전달
+      JsonNode response = flaskClient.explain(segmentsJson, start, end, lang);
+      
+      // 응답 파싱
+      Map<String, Object> result = new HashMap<>();
+      result.put("explanation", response.path("explanation").asText(""));
+      result.put("explanation_en", response.path("explanation_en").asText(""));
+      result.put("segment_count", response.path("segment_count").asInt(0));
+      
+      System.out.println("✅ 설명 생성 완료");
+      
+      return ResponseEntity.ok(result);
+      
+    } catch (Exception e) {
+      System.err.println("❌ 설명 생성 실패: " + e.getMessage());
+      e.printStackTrace();
+      
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put("error", "설명 생성 중 오류가 발생했습니다: " + e.getMessage());
+      return ResponseEntity.status(500).body(errorResponse);
     }
   }
 }

@@ -26,6 +26,8 @@ public class VideoController {
             @RequestParam("userName") String userName,
             @RequestParam(value = "duration", required = false, defaultValue = "0") Double duration,
             @RequestParam(value = "chapters", required = false) String chaptersJson,
+            @RequestParam(value = "segments", required = false) String segmentsJson,
+            @RequestParam(value = "detectedLang", required = false) String detectedLang,
             @RequestParam(value = "storedName", required = false) String existingStoredName) {
         
         System.out.println("====================================");
@@ -43,6 +45,18 @@ public class VideoController {
             SaveVideoRequest request = new SaveVideoRequest();
             request.setUserName(userName);
             request.setDuration(duration);
+            
+            // segmentsJson 설정
+            if (segmentsJson != null && !segmentsJson.trim().isEmpty()) {
+                request.setSegments(segmentsJson);
+                System.out.println("📝 Segments JSON 설정 완료");
+            }
+            
+            // detectedLang 설정
+            if (detectedLang != null && !detectedLang.trim().isEmpty()) {
+                request.setDetectedLang(detectedLang);
+                System.out.println("📝 언어 설정: " + detectedLang);
+            }
             
             // chaptersJson 파싱
             if (chaptersJson != null && !chaptersJson.trim().isEmpty()) {
@@ -109,7 +123,32 @@ public class VideoController {
             List<VideoChapter> chapters = videoService.getChaptersByStoredName(storedName);
             
             Map<String, Object> response = new HashMap<>();
-            response.put("video", video);
+            
+            // Video 정보를 Map으로 변환하여 전달 (segments 포함)
+            Map<String, Object> videoData = new HashMap<>();
+            videoData.put("videoId", video.getVideoId());
+            videoData.put("storedName", video.getStoredName());
+            videoData.put("userName", video.getUserName());
+            videoData.put("duration", video.getDuration());
+            videoData.put("createdAt", video.getCreatedAt());
+            videoData.put("updatedAt", video.getUpdatedAt());
+            videoData.put("detectedLang", video.getDetectedLang());
+            
+            // segments는 JSON 문자열로 저장되어 있으므로, 파싱하여 전달
+            if (video.getSegments() != null && !video.getSegments().isEmpty()) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Object segmentsObj = objectMapper.readValue(video.getSegments(), Object.class);
+                    videoData.put("segments", segmentsObj);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Segments 파싱 실패: " + e.getMessage());
+                    videoData.put("segments", null);
+                }
+            } else {
+                videoData.put("segments", null);
+            }
+            
+            response.put("video", videoData);
             response.put("chapters", chapters);
             
             return ResponseEntity.ok(response);

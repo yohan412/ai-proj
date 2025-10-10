@@ -25,6 +25,13 @@ public class Video {
     @Column(name = "DURATION", nullable = false)
     private Double duration = 0.0;
     
+    @Lob
+    @Column(name = "SEGMENTS", columnDefinition = "CLOB")
+    private String segments;  // JSON 형식의 자막 세그먼트
+    
+    @Column(name = "DETECTED_LANG", length = 10)
+    private String detectedLang;  // 감지된 언어 (예: "ko", "en", "ja")
+    
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
@@ -97,6 +104,22 @@ public class Video {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public String getSegments() {
+        return segments;
+    }
+    
+    public void setSegments(String segments) {
+        this.segments = segments;
+    }
+    
+    public String getDetectedLang() {
+        return detectedLang;
+    }
+    
+    public void setDetectedLang(String detectedLang) {
+        this.detectedLang = detectedLang;
     }
 }
 

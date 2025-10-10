@@ -56,6 +56,8 @@ public class VideoService {
         video.setUserName(request.getUserName());
         video.setFilePath(filePath.toString());
         video.setDuration(request.getDuration() != null ? request.getDuration() : 0.0);
+        video.setSegments(request.getSegments());  // segments JSON 저장
+        video.setDetectedLang(request.getDetectedLang());  // 감지된 언어 저장
         
         // 먼저 Video 저장
         video = videoRepository.save(video);
@@ -101,6 +103,16 @@ public class VideoService {
         // duration 업데이트 (필요시)
         if (request.getDuration() != null) {
             video.setDuration(request.getDuration());
+        }
+        
+        // segments 업데이트 (필요시)
+        if (request.getSegments() != null) {
+            video.setSegments(request.getSegments());
+        }
+        
+        // detectedLang 업데이트 (필요시)
+        if (request.getDetectedLang() != null) {
+            video.setDetectedLang(request.getDetectedLang());
         }
         
         video = videoRepository.save(video);

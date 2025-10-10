@@ -49,4 +49,27 @@ public class FlaskClient {
     }
     return mapper.readTree(resp.getBody());
   }
+
+  /** /explain (챕터 상세 설명 생성) */
+  public JsonNode explain(String segmentsJson, double start, double end, String lang) throws Exception {
+    String base = flaskUrl.endsWith("/") ? flaskUrl : flaskUrl + "/";
+    String url = base + "explain";
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+
+    // JSON 요청 바디 생성
+    String requestBody = String.format(
+      "{\"segments\": %s, \"start\": %.2f, \"end\": %.2f, \"lang\": \"%s\"}",
+      segmentsJson, start, end, lang != null ? lang : "ko"
+    );
+
+    HttpEntity<String> req = new HttpEntity<>(requestBody, headers);
+    ResponseEntity<String> resp = restTemplate.postForEntity(url, req, String.class);
+
+    if (!resp.getStatusCode().is2xxSuccessful()) {
+      throw new RuntimeException("Flask 설명 생성 오류: " + resp.getStatusCode() + " " + resp.getBody());
+    }
+    return mapper.readTree(resp.getBody());
+  }
 }

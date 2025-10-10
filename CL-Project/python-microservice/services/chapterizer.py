@@ -10,12 +10,9 @@ from transformers import BitsAndBytesConfig        # ★ NEW: BnB 4bit 설정 �
 from transformers import AutoConfig                # ★ NEW: 레포 config 로드 후 mxfp4 설정 제거
 
 from utils.helpers import round_time, ensure_json
+from services.translator import translate_text, translate_batch     # ★ NEW: 번역 기능 추가
 
-# Windows 한글 인코딩 문제 해결
-if sys.platform == "win32":
-    # 콘솔 출력을 UTF-8로 설정
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# Windows 한글 인코딩은 app.py에서 처리됨
 
 # 전역 파이프 캐시
 _pipe = None
@@ -237,6 +234,249 @@ def _extract_text(outputs: List[Dict[str, Any]]) -> str:
         return str(o["text"])
     return ""
 
+def _extract_time_boundaries(segments: List[Dict[str, Any]], duration: float, pipe) -> List[Dict[str, float]]:
+    """1단계: 소주제 경계만 추출 (시간 구간만) - MAJOR topics only"""
+    import re
+    import json
+    
+    print(f"[1단계] 시간 구간 추출 시작")
+    print(f"[1단계] 영상 길이: {duration:.1f}초")
+    print(f"[1단계] 자막 세그먼트: {len(segments)}개")
+    
+    # 전체 자막을 압축하여 프롬프트에 포함
+    transcript_lines = []
+    for s in segments[:200]:  # 최대 200개만
+        transcript_lines.append(f"{s.get('start', 0):.1f}s: {s.get('text', '').strip()}")
+    transcript_text = "\n".join(transcript_lines)
+    
+    # ★ 대폭 개선된 프롬프트
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a video content analyzer. Your task is to identify 4-8 MAJOR subtopics in this educational video.
+
+IMPORTANT RULES:
+1. Find only MAJOR topic transitions (e.g., "Introduction" → "Main Concept" → "Examples" → "Applications")
+2. Each segment should be at least 60 seconds long
+3. DO NOT split every sentence - group related content together
+4. Return EXACTLY 4-8 segments, no more
+
+Return this JSON format:
+{{"boundaries": [
+  {{"start": 0.0, "end": 120.5}},
+  {{"start": 120.5, "end": 250.0}}
+]}}
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Video duration: {duration:.1f} seconds
+
+Full transcript with timestamps:
+{transcript_text}
+
+Analyze the complete transcript and identify 4-8 MAJOR subtopics.
+Return ONLY the JSON with time boundaries.
+
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+{{"boundaries": [
+"""
+    
+    # ★ max_new_tokens=500, temperature=0.2
+    outputs = pipe(prompt, max_new_tokens=500, temperature=0.2)
+    text = _extract_text(outputs)
+    
+    # ★ 전체 응답 출력
+    print(f"[1단계] LLM 응답 (전체):")
+    print("=" * 80)
+    print(text)
+    print("=" * 80)
+    
+    # JSON 파싱
+    json_text = text
+    json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)  # 마지막 쉼표 제거
+    
+    try:
+        json_start = text.find('{')
+        if json_start == -1:
+            # { 없으면 시작 부분 추가
+            json_text = '{"boundaries": [' + text
+        else:
+            json_end = text.rfind('}') + 1
+            if json_end > json_start:
+                json_text = text[json_start:json_end]
+        
+        obj = json.loads(json_text)
+        boundaries = obj.get("boundaries", [])
+        
+        print(f"[1단계] 추출된 구간 수: {len(boundaries)}개")
+        for i, b in enumerate(boundaries):
+            duration_sec = b.get('end', 0) - b.get('start', 0)
+            print(f"  {i+1}. {b.get('start', 0):.1f}s ~ {b.get('end', 0):.1f}s (길이: {duration_sec:.1f}초)")
+        
+        return boundaries
+    except Exception as e:
+        print(f"[1단계] JSON 파싱 실패: {e}, 기본 구간 사용")
+        # 실패 시 균등 분할
+        num_chapters = 6
+        chunk_duration = duration / num_chapters
+        return [{"start": i * chunk_duration, "end": (i + 1) * chunk_duration} for i in range(num_chapters)]
+
+def _validate_and_merge_boundaries(boundaries: List[Dict[str, float]], duration: float, min_duration: float = 60.0) -> List[Dict[str, float]]:
+    """구간 검증 및 병합 - 너무 많거나 짧은 구간 처리"""
+    if not boundaries:
+        return boundaries
+    
+    print(f"\n[검증] 구간 검증 시작 - 입력: {len(boundaries)}개")
+    
+    # 1. 너무 많은 구간 필터링 (> 10개)
+    if len(boundaries) > 10:
+        print(f"[경고] 구간이 너무 많음 ({len(boundaries)}개) - 상위 8개만 사용")
+        # 긴 구간 우선 선택
+        boundaries_with_duration = []
+        for b in boundaries:
+            dur = b.get('end', 0) - b.get('start', 0)
+            boundaries_with_duration.append((b, dur))
+        
+        boundaries_with_duration.sort(key=lambda x: x[1], reverse=True)
+        boundaries = [b[0] for b in boundaries_with_duration[:8]]
+        boundaries.sort(key=lambda x: x.get('start', 0))
+        print(f"[검증] 필터링 후: {len(boundaries)}개 구간")
+    
+    # 2. 너무 짧은 구간 병합 (< min_duration)
+    merged = []
+    current = None
+    
+    for b in boundaries:
+        if current is None:
+            current = dict(b)  # 복사
+        else:
+            current_duration = current['end'] - current['start']
+            if current_duration < min_duration:
+                # 현재 구간이 너무 짧으면 다음 구간과 병합
+                current['end'] = b.get('end', current['end'])
+                print(f"[검증] 병합: {current['start']:.1f}s ~ {b.get('end', 0):.1f}s (너무 짧음)")
+            else:
+                # 현재 구간이 충분히 길면 추가하고 새로 시작
+                merged.append(current)
+                current = dict(b)
+    
+    # 마지막 구간 추가
+    if current:
+        merged.append(current)
+    
+    # 3. 최종 검증 - duration 초과 수정
+    for b in merged:
+        if b['end'] > duration:
+            print(f"[검증] 종료 시간 수정: {b['end']:.1f}s → {duration:.1f}s")
+            b['end'] = duration
+        if b['start'] >= b['end']:
+            b['end'] = min(b['start'] + 60.0, duration)
+            print(f"[검증] 시간 범위 수정: {b['start']:.1f}s ~ {b['end']:.1f}s")
+    
+    print(f"[검증] 최종 결과: {len(merged)}개 구간")
+    for i, b in enumerate(merged):
+        dur = b['end'] - b['start']
+        print(f"  {i+1}. {b['start']:.1f}s ~ {b['end']:.1f}s (길이: {dur:.1f}초)")
+    
+    return merged
+
+def _generate_chapter_metadata(segments: List[Dict[str, Any]], start: float, end: float, lang: str, pipe) -> Dict[str, str]:
+    """2단계: 해당 구간의 자막으로 제목/요약 생성 (원본 언어)"""
+    import re
+    import json
+    
+    # 해당 구간의 자막만 필터링
+    chapter_segments = [s for s in segments if s.get('start', 0) >= start and s.get('end', 0) <= end]
+    
+    if not chapter_segments:
+        print(f"[chapterizer] 경고: 구간 {start:.1f}s-{end:.1f}s에 자막 없음")
+        return {"title": "Untitled", "summary": "No content"}
+    
+    # 자막 텍스트 결합
+    transcript = " ".join([s.get('text', '').strip() for s in chapter_segments])
+    
+    if not transcript.strip():
+        print(f"[chapterizer] 경고: 구간 {start:.1f}s-{end:.1f}s의 자막이 비어있음")
+        return {"title": "Untitled", "summary": "No content"}
+    
+    # 언어에 따른 프롬프트
+    lang_name = _lang_label_from_code(lang)
+    
+    # ★ 개선된 프롬프트 - {"title": " 제거
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a content summarizer. Read the subtitles and create:
+1. A short title (3-5 words) in {lang_name}
+2. A brief summary (1-2 sentences) in {lang_name}
+
+Return ONLY this JSON:
+{{"title": "Title Here", "summary": "Summary here."}}
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Subtitles:
+{transcript[:800]}
+
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+    
+    print(f"[2단계] 자막 길이: {len(transcript)}자, 프롬프트 길이: {len(prompt)}자")
+    
+    # ★ max_new_tokens=200 (챕터 제목/요약용)
+    outputs = pipe(prompt, max_new_tokens=200, temperature=0.3)
+    text = _extract_text(outputs)
+    
+    print(f"[2단계] LLM 응답 (첫 200자): {text[:200]}")
+    
+    # JSON 파싱
+    json_text = text
+    json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)  # 마지막 쉼표 제거
+    
+    try:
+        # JSON 추출
+        json_start = text.find('{')
+        if json_start == -1:
+            # { 없으면 시작부터 JSON이라고 가정
+            json_text = '{"title": "' + text
+        else:
+            json_end = text.rfind('}') + 1
+            if json_end > json_start:
+                json_text = text[json_start:json_end]
+        
+        obj = json.loads(json_text)
+        title = obj.get("title", "").strip()
+        summary = obj.get("summary", "").strip()
+        
+        if title and summary:
+            print(f"[chapterizer] ✅ JSON 파싱 성공 - 제목: {title[:50]}")
+            return {"title": title, "summary": summary}
+        else:
+            raise ValueError("제목 또는 요약 비어있음")
+            
+    except Exception as e:
+        print(f"[chapterizer] ⚠️ JSON 파싱 실패: {e}, Regex fallback 시도...")
+        
+        # ★ Regex fallback
+        title_match = re.search(r'"title"\s*:\s*"([^"]+)"', text)
+        summary_match = re.search(r'"summary"\s*:\s*"([^"]+)"', text)
+        
+        if title_match and summary_match:
+            title = title_match.group(1).strip()
+            summary = summary_match.group(1).strip()
+            print(f"[chapterizer] ✅ Regex 파싱 성공 - 제목: {title[:50]}")
+            return {"title": title, "summary": summary}
+        
+        # ★ 최종 fallback - 의미있는 요약
+        print(f"[chapterizer] ❌ 파싱 완전 실패, 최종 fallback 사용")
+        sentences = transcript.split('. ')
+        first_sentence = sentences[0][:200] if sentences else transcript[:200]
+        
+        return {
+            "title": f"Part {int(start/60)+1}",
+            "summary": first_sentence
+        }
+
 def make_chapters_hf(
     *,
     segments: List[Dict[str, Any]],
@@ -255,236 +495,94 @@ def make_chapters_hf(
     low_cpu_mem: bool = True,
     torch_dtype_name: str = "auto",
 ) -> List[Dict[str, Any]]:
-    """세그먼트로부터 챕터 생성."""
-    print(f"[chapterizer] 함수 호출됨 - 세그먼트: {len(segments)}개, 언어: {lang}")
+    """★ NEW: 2단계 챕터 생성 방식 - 구간 추출 후 제목/요약 생성"""
+    print(f"[chapterizer] 2단계 분석 시작 - 세그먼트: {len(segments)}개, 언어: {lang}")
     print(f"[chapterizer] 모델 ID: {model_id}")
-    print(f"[chapterizer] 4bit 로딩: {load_in_4bit}")
     
     try:
-        print(f"[chapterizer] 시작 - 세그먼트: {len(segments)}개, 언어: {lang}")
-        
-        sys_lang = _lang_label_from_code(lang)
-        transcript_block = _pack_segments_for_prompt(segments, duration, max_segments_for_prompt)
-        print(f"[chapterizer] 프롬프트 준비 완료 - 길이: {len(transcript_block)}자")
-    except Exception as e:
-        print(f"[chapterizer] 프롬프트 준비 실패: {e}")
-        return []
-
-    # Llama-3.2-3B-Instruct 모델용 프롬프트 형식 (전체 자막 기반 소주제 분석)
-    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-You are an expert video content analyzer. Your task is to analyze the ENTIRE video transcript and identify major subtopics, then create chapters that group related content by these subtopics.
-
-ANALYSIS PROCESS:
-1. Read through the ENTIRE transcript to understand the overall content structure
-2. Identify 4-8 major subtopics or themes that span multiple segments
-3. Group consecutive segments that belong to the same subtopic
-4. Create chapter boundaries where subtopics change
-5. Each chapter should cover a coherent subtopic with multiple related segments
-
-IMPORTANT RULES:
-- Analyze the WHOLE transcript, not individual segments
-- Create 4-8 chapters maximum (not one per segment)
-- Each chapter should span multiple consecutive segments
-- Chapters must represent distinct subtopics or themes
-- Use chronological order
-- Concise, descriptive chapter titles (2-6 words in ENGLISH)
-- 1-2 sentence summaries explaining the subtopic (in ENGLISH)
-- Times in seconds (float format)
-- Write ALL text in ENGLISH only (title and summary must be in English)
-- Use ONLY basic ASCII characters (a-z, A-Z, 0-9, space, punctuation)
-- NO Korean, NO Chinese, NO Japanese, NO Unicode symbols
-
-Return STRICT JSON ONLY with this exact schema:
-{{"chapters": [{{"start": <float>, "end": <float>, "title": "<string>", "summary": "<string>"}}]}}
-
-EXAMPLE OUTPUT:
-{{"chapters": [
-  {{"start": 0.0, "end": 120.5, "title": "Introduction to Elements", "summary": "Overview of what elements are and their basic properties."}},
-  {{"start": 120.5, "end": 305.2, "title": "Types of Elements", "summary": "Discussion of different types and classifications of elements."}}
-]}}
-
-DO NOT:
-- Create one chapter per segment
-- Include explanatory text before or after JSON
-- Use markdown code blocks
-- Use ANY non-English characters
-- Use Unicode escape sequences
-
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Video duration: {round_time(duration)} seconds
-Complete transcript (in Korean):
-{transcript_block}
-
-Analyze the ENTIRE transcript above and identify 4-8 major subtopics. Create chapters that group related segments by subtopic. 
-IMPORTANT: Write chapter titles and summaries in ENGLISH only, even though the transcript is in Korean.
-Return ONLY the JSON object, nothing else.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-
-    try:
+        # 파이프라인 로드
         print(f"[chapterizer] 모델 로딩 중...")
         pipe = _get_pipe(
-            model_id, load_in_4bit, temperature, max_new_tokens, hf_token,
+            model_id, load_in_4bit, 0.3, max_new_tokens, hf_token,
             max_gpu_mem=max_gpu_mem,
             max_cpu_mem=max_cpu_mem,
             offload_dir=offload_dir,
             low_cpu_mem=low_cpu_mem,
             torch_dtype_name=torch_dtype_name
         )
-        print(f"[chapterizer] 모델 로딩 완료, 소주제 분석 시작...")
         
-        # Llama 모델용 단일 프롬프트 처리
-        print(f"[chapterizer] 파이프 실행 시작...")
-        print(f"[chapterizer] 프롬프트 길이: {len(prompt)}자")
-        print(f"[chapterizer] 프롬프트 미리보기: {prompt[:200]}...")
-        print(f"[chapterizer] 파이프 객체 타입: {type(pipe)}")
-        print(f"[chapterizer] 파이프 실행 전 상태 확인...")
-        
-        # 파이프 실행 전 추가 검증
         if pipe is None:
-            print(f"[chapterizer] 오류: 파이프 객체가 None입니다!")
+            print(f"[chapterizer] 오류: 파이프 로드 실패!")
             return []
         
-        print(f"[chapterizer] 파이프 객체 검증 완료, 추론 시작...")
+        print(f"[chapterizer] 모델 로딩 완료")
         
-        try:
-            print(f"[chapterizer] pipe(prompt) 호출 시작...")
-            import sys
-            sys.stdout.flush()  # 버퍼 강제 flush
-            
-            outputs = pipe(prompt)
-            
-            print(f"[chapterizer] pipe(prompt) 호출 완료!")
-            sys.stdout.flush()
-            print(f"[chapterizer] 파이프 실행 완료, outputs 타입: {type(outputs)}")
-            print(f"[chapterizer] outputs 길이: {len(outputs) if outputs else 0}")
-            sys.stdout.flush()
-            
-            if outputs and len(outputs) > 0:
-                print(f"[chapterizer] outputs[0] keys: {list(outputs[0].keys()) if isinstance(outputs[0], dict) else 'not dict'}")
-            print(f"[chapterizer] outputs 내용 (첫 200자): {str(outputs)[:200]}...")
-            sys.stdout.flush()
-        except Exception as pipe_error:
-            print(f"[chapterizer] pipe(prompt) 실행 중 오류: {pipe_error}")
-            import traceback
-            traceback.print_exc()
-            sys.stdout.flush()
+        # ★ 1단계: 시간 구간 추출
+        boundaries = _extract_time_boundaries(segments, duration, pipe)
+        
+        if not boundaries:
+            print(f"[chapterizer] 경고: 구간 추출 실패, 빈 리스트 반환")
             return []
+        
+        # ★ 구간 검증 및 병합
+        boundaries = _validate_and_merge_boundaries(boundaries, duration, min_duration=60.0)
+        
+        # ★ 2단계: 각 구간의 제목/요약 생성
+        print(f"\n[chapterizer] 2단계: 각 구간의 제목/요약 생성 시작 ({len(boundaries)}개 구간)")
+        print("=" * 80)
+        chapters = []
+        success_count = 0
+        fallback_count = 0
+        
+        for i, boundary in enumerate(boundaries):
+            start = float(boundary.get('start', 0))
+            end = float(boundary.get('end', duration))
+            
+            # 시간 범위 검증
+            start = max(0.0, min(start, duration))
+            end = max(start + 10.0, min(end, duration))  # 최소 10초 보장
+            
+            print(f"\n  [{i+1}/{len(boundaries)}] 구간 분석: {start:.1f}s ~ {end:.1f}s (길이: {end-start:.1f}초)")
+            
+            # 해당 구간의 제목/요약 생성
+            metadata = _generate_chapter_metadata(segments, start, end, lang, pipe)
+            
+            title = metadata.get("title", "Untitled")
+            summary = metadata.get("summary", "")
+            
+            chapters.append({
+                "start": start,
+                "end": end,
+                "title": title,
+                "summary": summary
+            })
+            
+            # 성공/실패 카운트
+            if title.startswith("Part ") or title.startswith("Chapter "):
+                fallback_count += 1
+                print(f"     ⚠️ Fallback 사용됨")
+            else:
+                success_count += 1
+                print(f"     ✅ 성공")
+            
+            print(f"     제목: {title}")
+            print(f"     요약: {summary[:100]}{'...' if len(summary) > 100 else ''}")
+        
+        print(f"\n{'=' * 80}")
+        print(f"[챕터 2단계 분석 완료]")
+        print(f"[생성된 챕터 수] {len(chapters)}개")
+        print(f"[성공] {success_count}개 / [Fallback] {fallback_count}개")
+        
+        if chapters:
+            print(f"\n[챕터 목록]")
+            for i, chapter in enumerate(chapters):
+                print(f"  {i+1}. [{chapter['start']:.2f}s - {chapter['end']:.2f}s] {chapter['title']}")
+        
+        print()
+        return chapters
         
     except Exception as e:
-        print(f"[chapterizer] 파이프 실행 중 오류 발생: {e}")
+        print(f"[chapterizer] 2단계 분석 중 오류: {e}")
         import traceback
         traceback.print_exc()
         return []
-    
-    text = _extract_text(outputs)
-    print(f"[chapterizer] 추론 완료, 응답 길이: {len(text)}자")
-    
-    # 전체 응답 내용 출력 (디버깅용)
-    print(f"\n{'='*80}")
-    print(f"[모델 생성 결과 - 전체]")
-    print(f"{'='*80}")
-    print(text)
-    print(f"{'='*80}\n")
-    
-    print(f"[chapterizer] 응답 내용 (첫 500자): {text[:500]}...")
-
-    # JSON 파싱 개선 - Unicode 이스케이프 시퀀스 문제 해결
-    print(f"[chapterizer] JSON 추출 시작...")
-    
-    # re 모듈을 함수 시작 부분에서 import
-    import re
-    import json
-    
-    # 1차: { } 사이의 JSON 추출
-    json_start = text.find('{')
-    json_end = text.rfind('}') + 1
-    
-    if json_start != -1 and json_end > json_start:
-        json_text = text[json_start:json_end]
-        print(f"[chapterizer] 추출된 JSON (1차): {json_text[:200]}...")
-        
-        # Unicode 이스케이프 시퀀스 정리
-        # 잘못된 유니코드 이스케이프 시퀀스 제거 (예: \u0326, \u0328 등)
-        json_text = re.sub(r'\\u[0-9a-fA-F]{4}', '', json_text)
-        print(f"[chapterizer] 유니코드 정리 후: {json_text[:200]}...")
-        
-        # JSON 파싱 시도
-        try:
-            obj = json.loads(json_text)
-            print(f"[chapterizer] JSON 파싱 성공 (1차)")
-        except Exception as e:
-            print(f"[chapterizer] JSON 파싱 실패 (1차): {e}")
-            
-            # 2차: 정규식으로 재시도
-            json_pattern = r'\{[^{}]*"chapters"[^{}]*\[[^\]]*\][^{}]*\}'
-            json_matches = re.findall(json_pattern, text, re.DOTALL)
-            if json_matches:
-                json_text = json_matches[0]
-                # 유니코드 정리
-                json_text = re.sub(r'\\u[0-9a-fA-F]{4}', '', json_text)
-                print(f"[chapterizer] 정규식으로 추출된 JSON: {json_text[:200]}...")
-                try:
-                    obj = json.loads(json_text)
-                    print(f"[chapterizer] JSON 파싱 성공 (2차)")
-                except Exception as e2:
-                    print(f"[chapterizer] JSON 파싱 실패 (2차): {e2}")
-                    obj = {}
-            else:
-                print(f"[chapterizer] 정규식으로도 JSON을 찾을 수 없음")
-                obj = {}
-    else:
-        print(f"[chapterizer] JSON을 찾을 수 없음, 전체 텍스트에서 파싱 시도")
-        # 유니코드 정리
-        text = re.sub(r'\\u[0-9a-fA-F]{4}', '', text)
-        try:
-            obj = json.loads(text)
-            print(f"[chapterizer] 전체 텍스트 JSON 파싱 성공")
-        except Exception as e:
-            print(f"[chapterizer] 전체 텍스트 JSON 파싱 실패: {e}")
-            obj = {}
-    
-    # 최종 검증
-    if not obj or not obj.get("chapters"):
-        print(f"[chapterizer] 최종 JSON 파싱 실패")
-        obj = {}
-    
-    chapters = obj.get("chapters") or []
-    print(f"[chapterizer] 파싱된 챕터 수: {len(chapters)}개")
-
-    cleaned: List[Dict[str, Any]] = []
-    for ch in chapters:
-        try:
-            st = round_time(float(ch.get("start", 0.0)))
-            en = round_time(float(ch.get("end", st)))
-        except Exception:
-            st, en = 0.0, 0.0
-        st = max(0.0, min(st, duration))
-        en = max(st, min(en, duration))
-        title = (ch.get("title") or "").strip()
-        summary = (ch.get("summary") or "").strip()
-        cleaned.append({"start": st, "end": en, "title": title, "summary": summary})
-
-    cleaned.sort(key=lambda x: x["start"])
-    # 겹침 제거
-    for i in range(1, len(cleaned)):
-        if cleaned[i]["start"] < cleaned[i-1]["end"]:
-            cleaned[i]["start"] = cleaned[i-1]["end"]
-            cleaned[i]["end"] = max(cleaned[i]["end"], cleaned[i]["start"])
-    
-    print(f"[chapterizer] 최종 챕터 수: {len(cleaned)}개")
-    
-    # 챕터 분석 완료 로그
-    print(f"\n[챕터 분석 완료]")
-    print(f"[생성된 챕터 수] {len(cleaned)}개")
-    if cleaned:
-        print(f"\n[챕터 목록]")
-        for i, chapter in enumerate(cleaned):
-            print(f"  {i+1}. [{chapter.get('start', 0):.2f}s - {chapter.get('end', 0):.2f}s] {chapter.get('title', '제목 없음')}")
-    else:
-        print(f"[경고] 챕터가 생성되지 않았습니다.")
-    print()
-    
-    return cleaned
