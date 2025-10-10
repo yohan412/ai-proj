@@ -24,7 +24,7 @@ os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
 
 from config import Settings
 from services.transcriber import transcribe_file
-from services.chapterizer import make_chapters_hf, _get_pipe, _extract_text, _lang_label_from_code  # ★ NEW: 추가 함수 import
+from services.chapterizer import make_chapters_hf, _get_pipe, _extract_text
 
 # (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
 # try:

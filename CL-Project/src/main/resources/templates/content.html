@@ -33,41 +33,6 @@
     .viewer-inner{ display:flex; flex-direction:column; height:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; overflow:hidden; box-shadow:0 0 10px rgba(0,0,0,.3); min-width:700px; }
     .preview-area{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:var(--panel-2); min-height:var(--min-preview-h); }
     .preview-area video, .preview-area img{ max-height:100%; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
-    .preview-area.has-chapter{ border:3px solid var(--accent); box-shadow:0 0 20px rgba(31,144,255,0.5); }
-    
-    /* 구간 재생 중 오버레이 */
-    .chapter-overlay{ position:absolute; bottom:15px; left:15px; background:rgba(0,0,0,0.85); color:white; padding:10px 15px; border-radius:6px; font-size:13px; z-index:50; display:none; border-left:4px solid var(--accent); }
-    .preview-area.has-chapter .chapter-overlay{ display:block; }
-    
-    /* X 버튼 */
-    .close-button{ 
-        position:absolute; 
-        top:15px; 
-        right:15px; 
-        width:36px; 
-        height:36px; 
-        background:rgba(0,0,0,0.75); 
-        color:white; 
-        border:2px solid rgba(255,255,255,0.3); 
-        border-radius:50%; 
-        cursor:pointer; 
-        font-size:18px; 
-        font-weight:bold; 
-        z-index:100; 
-        display:none; 
-        transition:all 0.2s; 
-        padding:0; 
-        align-items:center; 
-        justify-content:center;
-    }
-    .close-button:hover{ 
-        background:rgba(255,77,77,0.9); 
-        border-color:rgba(255,255,255,0.6); 
-        transform:scale(1.1); 
-    }
-    .preview-area.has-chapter .close-button{ 
-        display:flex !important; 
-    }
 
     /* ===== 타임라인 ===== */
     .timeline-container{ position:relative; background:var(--panel); padding:48px 20px 20px; border-top:1px solid var(--line); min-height:var(--min-timeline-h); }
@@ -485,11 +450,6 @@
           <div id="video-wrapper" style="position:relative; max-width:100%; max-height:100%; display:flex; align-items:center; justify-content:center;">
             <img id="preview-media" alt="video preview" src="https://via.placeholder.com/800x450/2e3842/9fb3c8?text=%EC%98%81%EC%83%81%EC%9D%84+%EC%84%A0%ED%83%9D%ED%95%98%EC%84%B8%EC%9A%94"/>
           </div>
-          <div class="chapter-overlay" id="chapter-overlay">
-            <div style="font-weight:bold; margin-bottom:4px;">🎬 구간 재생 중</div>
-            <div id="overlay-info" style="font-size:12px; opacity:0.9;"></div>
-          </div>
-          <button class="close-button" id="close-button" title="원본 영상으로 돌아가기">×</button>
         </div>
 
         <div class="timeline-container">
@@ -528,9 +488,6 @@
     const timeline = document.getElementById('timeline');
     const videoListEl = document.getElementById('video-list');
     const videoSearchEl = document.getElementById('video-search');
-    const closeButton = document.getElementById('close-button');
-    const chapterOverlay = document.getElementById('chapter-overlay');
-    const overlayInfo = document.getElementById('overlay-info');
     const chaptersWrap = document.getElementById('chapters');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const leftSidebar = document.getElementById('left-sidebar');
@@ -541,7 +498,6 @@
     let currentChapters = [];
     let currentSegments = []; // ★ NEW: 자막 세그먼트 저장
     let currentDetectedLang = 'ko'; // ★ NEW: 감지된 언어
-    let currentChapter = null; // 현재 재생 중인 구간
     let allVideos = []; // 전체 영상 목록
     let explanationQueue = []; // ★ NEW: 설명 요청 큐
     let isProcessingExplanation = false; // ★ NEW: 큐 처리 중 플래그
@@ -842,99 +798,6 @@
       });
     }
 
-    /* ===== 구간 재생 ===== */
-    async function playChapter(index) {
-      const chapter = currentChapters[index];
-      if (!chapter) return;
-      
-      console.log(`구간 재생: ${chapter.title} (${chapter.start}s ~ ${chapter.end}s)`);
-      
-      try {
-        // Flask로 구간 영상 요청
-          const videoResponse = await fetch(`/api/videos/stream/${currentStoredName}`);
-        if (!videoResponse.ok) throw new Error('영상 로드 실패');
-          const videoBlob = await videoResponse.blob();
-        
-        const fd = new FormData();
-          fd.append('file', videoBlob, currentStoredName);
-        fd.append('start', chapter.start);
-        fd.append('end', chapter.end);
-        
-        const res = await fetch('http://localhost:5001/clip', {
-          method: 'POST',
-          body: fd
-        });
-        
-        if (!res.ok) throw new Error('구간 영상 생성 실패');
-        
-        const blob = await res.blob();
-        const clipUrl = URL.createObjectURL(blob);
-        
-        // 구간 영상 표시
-        videoWrapper.innerHTML = '';
-        const clipVideo = document.createElement('video');
-        clipVideo.src = clipUrl;
-        clipVideo.controls = true;
-        clipVideo.style.maxHeight = '100%';
-        clipVideo.style.maxWidth = '100%';
-        clipVideo.style.objectFit = 'contain';
-        clipVideo.autoplay = true;
-        clipVideo.loop = true;
-        videoWrapper.appendChild(clipVideo);
-        
-        currentChapter = { ...chapter, clipUrl, clipVideo };
-        previewArea.classList.add('has-chapter');
-        
-        // 오버레이 정보 업데이트
-          overlayInfo.innerHTML = `
-          <div style="margin-bottom:2px;"><strong>${chapter.title}</strong></div>
-          <div style="opacity:0.8;">${chapter.start.toFixed(1)}s ~ ${chapter.end.toFixed(1)}s (${(chapter.end - chapter.start).toFixed(1)}초)</div>
-        `;
-        
-        // 타임라인 활성화
-        document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
-        const activeItem = timeline.querySelector(`[data-index="${index}"]`);
-        if (activeItem) activeItem.classList.add('active');
-        
-        console.log('✅ 구간 재생 시작');
-        
-      } catch (error) {
-        console.error('❌ 구간 재생 실패:', error);
-        alert('구간 영상 재생 중 오류가 발생했습니다:\n' + error.message);
-      }
-    }
-
-    /* ===== 원본 영상으로 복귀 ===== */
-    function returnToOriginal() {
-      console.log('원본 영상으로 복귀');
-      
-      if (currentChapter && currentChapter.clipUrl) {
-        URL.revokeObjectURL(currentChapter.clipUrl);
-      }
-      
-      currentChapter = null;
-      previewArea.classList.remove('has-chapter');
-      
-      // 원본 영상 다시 로드
-      if (currentStoredName) {
-        const videoUrl = `/api/videos/stream/${currentStoredName}`;
-      videoWrapper.innerHTML = '';
-      
-        videoEl = document.createElement('video');
-        videoEl.src = videoUrl;
-        videoEl.controls = true;
-        videoEl.style.maxHeight = '100%';
-        videoEl.style.maxWidth = '100%';
-        videoEl.style.objectFit = 'contain';
-        videoWrapper.appendChild(videoEl);
-      }
-      
-      // 활성 상태 해제
-      document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
-      
-      console.log('✅ 원본 영상 복귀 완료');
-    }
-
     /* ===== 시점 이동 함수 ===== */
     function seekToTime(time) {
       if (!videoEl || !duration) return;
@@ -951,20 +814,7 @@
       const clickX = e.clientX - rect.left;
       const clickTime = (clickX / rect.width) * duration;
       
-      if (currentChapter && currentChapter.clipVideo) {
-        // 구간 영상 재생 중
-        const relativeTime = clickTime - currentChapter.start;
-        currentChapter.clipVideo.currentTime = Math.max(0, Math.min(currentChapter.end - currentChapter.start, relativeTime));
-        } else {
-        // 원본 영상 재생 중
-        videoEl.currentTime = Math.max(0, Math.min(duration, clickTime));
-      }
-    });
-
-    /* ===== X 버튼 클릭 ===== */
-    closeButton.addEventListener('click', (e) => {
-          e.stopPropagation();
-      returnToOriginal();
+      videoEl.currentTime = Math.max(0, Math.min(duration, clickTime));
     });
     
     /* ===== 챕터 리스트 렌더링 (오른쪽 패널) ===== */

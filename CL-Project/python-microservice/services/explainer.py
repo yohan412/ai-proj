@@ -1,17 +1,6 @@
 # services/explainer.py
 from typing import List, Dict, Any, Optional
-
-def _lang_label_from_code(code: Optional[str]) -> str:
-    """언어 코드를 전체 이름으로 변환"""
-    code = (code or "").lower()
-    table = {
-        "ko": "Korean", "en": "English", "ja": "Japanese",
-        "zh": "Chinese", "es": "Spanish", "fr": "French",
-        "de": "German", "it": "Italian", "pt": "Portuguese",
-        "ru": "Russian", "vi": "Vietnamese", "id": "Indonesian",
-        "th": "Thai", "hi": "Hindi", "ar": "Arabic",
-    }
-    return table.get(code, code or "Korean")
+from services.chapterizer import _lang_label_from_code  # ★ chapterizer에서 import
 
 def generate_explanation(
     *,

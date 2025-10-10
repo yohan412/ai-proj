@@ -98,7 +98,7 @@ public class AnalyzeController {
   /**
    * 챕터 구간에 대한 상세 설명 생성
    * 요청 바디: { "segments": [...], "start": 10.5, "end": 20.3, "lang": "ko" }
-   * 응답: { "explanation": "...", "explanation_en": "..." }
+   * 응답: { "explanation": "...", "segment_count": 0 }
    */
   @PostMapping(
       value = "/explain",
@@ -125,7 +125,6 @@ public class AnalyzeController {
       // 응답 파싱
       Map<String, Object> result = new HashMap<>();
       result.put("explanation", response.path("explanation").asText(""));
-      result.put("explanation_en", response.path("explanation_en").asText(""));
       result.put("segment_count", response.path("segment_count").asInt(0));
       
       System.out.println("✅ 설명 생성 완료");
