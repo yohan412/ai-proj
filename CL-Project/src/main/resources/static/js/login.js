@@ -203,3 +203,28 @@ function showLoginError(message) {
     }
 }
 
+/**
+ * 로그인 상태 확인 후 페이지 이동
+ */
+async function checkLoginAndNavigate(url) {
+    try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        
+        if (data.loggedIn) {
+            window.location.href = url;
+        } else {
+            alert('로그인이 필요한 서비스입니다.');
+            if (typeof toggleLoginPopup === 'function') {
+                toggleLoginPopup();
+            }
+        }
+    } catch (error) {
+        console.error('세션 확인 오류:', error);
+        alert('로그인이 필요한 서비스입니다.');
+        if (typeof toggleLoginPopup === 'function') {
+            toggleLoginPopup();
+        }
+    }
+}
+

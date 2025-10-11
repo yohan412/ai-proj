@@ -8,8 +8,8 @@
 					<div id="menu" data-header-loaded="true">
 						<ul id="menu-items">
 							<li><a th:href="@{/}">Home</a></li>
-							<li><a th:href="@{/manage}">Manage</a></li>
-				            <li><a th:href="@{/content}">Content</a></li>
+							<li><a href="#" onclick="checkLoginAndNavigate('/manage'); return false;">Manage</a></li>
+				            <li><a href="#" onclick="checkLoginAndNavigate('/content'); return false;">Content</a></li>
 							<!-- 비로그인 시 표시 -->
 							<li id="menu-signup" style="display:none;"><a href="#" onclick="toggleSignupPopup()">Sign Up</a></li>
 							<li id="menu-login" style="display:none;"><a href="#" onclick="toggleLoginPopup()">LogIn</a></li>
@@ -56,6 +56,5 @@
 	        </div>
 	    </div>
 	</div>
-	
 
 </div>
