@@ -47,20 +47,44 @@ def generate_explanation(
     lang_name = _lang_label_from_code(lang)
     print(f"  - 타겟 언어: {lang_name}")
     
-    # 프롬프트 생성
-    explanation_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    # ★ 타겟 언어에 따라 프롬프트 언어 선택
+    if lang_name == "Korean":
+        # 한글 프롬프트
+        explanation_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-You are an educational content analyzer. Analyze the given content and provide a clear explanation in {lang_name}.
+당신은 교육 컨텐츠 분석 전문가입니다. 주어진 내용을 분석하고 명확한 설명을 한글로 제공하세요.
 
-IMPORTANT:
-- SUMMARIZE and EXPLAIN the key concepts (do NOT copy the original text)
-- Use natural {lang_name} language
-- Provide 3-5 sentences with educational insights
-- Rephrase the ideas in your own words
+중요 규칙:
+- 핵심 개념을 요약하고 설명하세요
+- 자연스러운 한글을 사용하세요
+- 교육적 인사이트를 포함한 3-5문장으로 작성하세요
+- 영어 단어를 절대 사용하지 마세요
+- 전문 용어도 한글로 풀어 쓰세요
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
-Analyze this content and explain the main ideas in {lang_name}:
+다음 내용을 분석하고 주요 아이디어를 한글로 설명하세요:
+
+{transcript_text[:1500]}
+
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+    else:
+        # 영어 프롬프트
+        explanation_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are an educational content analyzer. Provide explanation in {lang_name}.
+
+CRITICAL RULES:
+- Write ONLY in {lang_name}
+- Summarize and explain key concepts
+- Provide 3-5 sentences with educational insights
+- Rephrase ideas in your own words
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Analyze and explain in {lang_name}:
 
 {transcript_text[:1500]}
 
@@ -68,8 +92,12 @@ Analyze this content and explain the main ideas in {lang_name}:
 
 """
     
-    # LLM으로 설명 생성
-    outputs = pipe(explanation_prompt)
+    # LLM으로 설명 생성 (최적 파라미터: temperature=0.27)
+    outputs = pipe(
+        explanation_prompt,
+        max_new_tokens=400,
+        temperature=0.27
+    )
     explanation = _extract_text(outputs).strip()
     
     print(f"[LLM 생성 완료]")

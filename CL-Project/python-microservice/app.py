@@ -8,6 +8,10 @@ import io
 import subprocess
 import hashlib
 
+# ★ NEW: .env 파일 로드
+from dotenv import load_dotenv
+load_dotenv()
+
 # Windows 한글 인코딩 문제 해결
 if sys.platform == "win32":
     # 콘솔 출력을 UTF-8로 설정

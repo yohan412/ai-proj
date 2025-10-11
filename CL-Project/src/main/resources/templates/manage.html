@@ -1200,6 +1200,23 @@
         const sum = document.createElement('div');
         sum.className = 'chapter-summary';
         sum.textContent = ch.summary || '';
+        
+        // ★ NEW: 평균 집중도 표시
+        if (ch.avgAttention !== undefined && ch.avgAttention > 0) {
+          const attentionDiv = document.createElement('div');
+          attentionDiv.style.cssText = `
+            font-size: 11px;
+            color: #4ade80;
+            background: rgba(74,222,128,0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+            font-weight: 600;
+          `;
+          const percentage = (ch.avgAttention * 100).toFixed(0);
+          attentionDiv.textContent = `📊 평균 집중도: ${percentage}% (${ch.totalViews || 0}명)`;
+          card.appendChild(attentionDiv);
+        }
 
         // 컨트롤 버튼 컨테이너
         const controls = document.createElement('div');
@@ -2164,13 +2181,35 @@
         duration = video.duration;
         updateTimeLabel(0, duration);
         
-        // 챕터 데이터 변환
-        const convertedChapters = chapters.map(ch => ({
-          start: ch.startTime,
-          end: ch.endTime,
-          title: ch.title,
-          summary: ch.summary
-        }));
+        // 챕터 데이터 변환 및 평균 집중도 로드
+        const convertedChapters = [];
+        for (let i = 0; i < chapters.length; i++) {
+          const ch = chapters[i];
+          const converted = {
+            chapterId: ch.chapterId,
+            start: ch.startTime,
+            end: ch.endTime,
+            title: ch.title,
+            summary: ch.summary,
+            avgAttention: 0,
+            totalViews: 0
+          };
+          
+          // 평균 집중도 로드
+          try {
+            const avgResponse = await fetch(`/api/attention/chapter/${ch.chapterId}/average`);
+            if (avgResponse.ok) {
+              const avgData = await avgResponse.json();
+              converted.avgAttention = avgData.avgAttentionScore || 0;
+              converted.totalViews = avgData.totalViews || 0;
+              console.log(`📊 챕터 "${ch.title}" 평균 집중도: ${(converted.avgAttention * 100).toFixed(0)}% (${converted.totalViews}명)`);
+            }
+          } catch (error) {
+            console.error('평균 집중도 로드 실패:', error);
+          }
+          
+          convertedChapters.push(converted);
+        }
         
         analyzedChapters = convertedChapters;
         

@@ -9,7 +9,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * JPA 및 Oracle Database 사용
  */
 @SpringBootApplication
-@EnableJpaRepositories(basePackages = {"com.example.CL.Project.user", "com.example.CL.Project.video"})
+@EnableJpaRepositories(basePackages = {
+    "com.example.CL.Project.user", 
+    "com.example.CL.Project.video",
+    "com.example.CL.Project.attention"
+})
 public class ClProjectApplication {
     public static void main(String[] args) {
         SpringApplication.run(ClProjectApplication.class, args);

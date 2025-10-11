@@ -150,8 +150,10 @@ def _get_pipe(
                 _pipe = pipeline(
                     "text-generation",
                     model=mdl, tokenizer=tok,
-                    temperature=temperature, max_new_tokens=max_new_tokens,
-                    do_sample=True, return_full_text=False,
+                    temperature=temperature, 
+                    max_new_tokens=max_new_tokens,
+                    do_sample=True, 
+                    return_full_text=False,
                     pad_token_id=tok.eos_token_id
                 )
                 print(f"[chapterizer] 4bit 파이프라인 생성 완료")
@@ -182,8 +184,10 @@ def _get_pipe(
         _pipe = pipeline(
             "text-generation",
             model=mdl, tokenizer=tok,
-            temperature=temperature, max_new_tokens=max_new_tokens,
-            do_sample=True, return_full_text=False,
+            temperature=temperature, 
+            max_new_tokens=max_new_tokens,
+            do_sample=True, 
+            return_full_text=False,
             pad_token_id=tok.eos_token_id
         )
         print(f"[chapterizer] FP 파이프라인 생성 완료")
@@ -401,15 +405,43 @@ def _generate_chapter_metadata(segments: List[Dict[str, Any]], start: float, end
     # 언어에 따른 프롬프트
     lang_name = _lang_label_from_code(lang)
     
-    # ★ 개선된 프롬프트 - {"title": " 제거
-    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    # ★ 타겟 언어에 따라 프롬프트 언어 선택
+    if lang_name == "Korean":
+        # 한글 프롬프트
+        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-You are a content summarizer. Read the subtitles and create:
-1. A short title (3-5 words) in {lang_name}
-2. A brief summary (1-2 sentences) in {lang_name}
+당신은 교육 컨텐츠 요약 전문가입니다. 주어진 자막을 읽고 다음을 생성하세요:
+1. 짧은 제목 (3-5단어) - 반드시 한글로만 작성
+2. 간단한 요약 (1-2문장) - 반드시 한글로만 작성
+
+중요 규칙:
+- 영어 단어를 절대 사용하지 마세요
+- 순수 한글만 사용하세요
+- 전문 용어도 한글로 풀어 쓰세요
+
+다음 JSON 형식으로만 응답하세요:
+{{"title": "제목", "summary": "요약 내용"}}
+
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+자막 내용:
+{transcript[:800]}
+
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+    else:
+        # 영어 프롬프트
+        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a content summarizer. Create title and summary in {lang_name}.
+
+CRITICAL RULES:
+- Use ONLY {lang_name} language
+- Write naturally in {lang_name}
 
 Return ONLY this JSON:
-{{"title": "Title Here", "summary": "Summary here."}}
+{{"title": "Title in {lang_name}", "summary": "Summary in {lang_name}"}}
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -422,8 +454,12 @@ Subtitles:
     
     print(f"[2단계] 자막 길이: {len(transcript)}자, 프롬프트 길이: {len(prompt)}자")
     
-    # ★ max_new_tokens=200 (챕터 제목/요약용)
-    outputs = pipe(prompt, max_new_tokens=200, temperature=0.3)
+    # ★ 최적 파라미터: temperature=0.27 (반복 방지 + 영어 혼재 최소화)
+    outputs = pipe(
+        prompt, 
+        max_new_tokens=200, 
+        temperature=0.27
+    )
     text = _extract_text(outputs)
     
     print(f"[2단계] LLM 응답 (첫 200자): {text[:200]}")

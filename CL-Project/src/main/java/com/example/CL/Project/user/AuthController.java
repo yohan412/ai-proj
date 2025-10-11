@@ -217,6 +217,32 @@ public class AuthController {
     }
     
     /**
+     * 현재 사용자 유형 조회 API
+     * @return 사용자 유형 (admin, teacher, student, guest)
+     */
+    @GetMapping("/user-type")
+    public ResponseEntity<?> getUserType() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        if (authentication != null && authentication.isAuthenticated() 
+                && !authentication.getPrincipal().equals("anonymousUser")) {
+            
+            String username = authentication.getName();
+            User user = userService.findByUsername(username);
+            
+            response.put("userType", user.getUserType());
+            log.debug("사용자 타입 조회: username={}, userType={}", username, user.getUserType());
+        } else {
+            response.put("userType", "guest");
+            log.debug("사용자 타입 조회: 비로그인 상태 (guest)");
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
      * 에러 응답 생성 헬퍼 메서드
      */
     private Map<String, Object> createErrorResponse(String message) {

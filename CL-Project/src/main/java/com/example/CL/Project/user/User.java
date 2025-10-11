@@ -75,6 +75,13 @@ public class User {
     private String password;
     
     /**
+     * 사용자 유형 (admin, teacher, student)
+     */
+    @Column(name = "USER_TYPE", nullable = false, length = 20)
+    @Builder.Default
+    private String userType = "student";
+    
+    /**
      * 계정 활성화 여부
      */
     @Column(name = "ENABLED", nullable = false)

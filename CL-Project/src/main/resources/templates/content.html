@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="/css/header.css" />
   <link rel="stylesheet" href="/css/login.css" />
 
+  <!-- MediaPipe for Gaze Tracking -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+
   <style>
     :root{
       --bg:#2e3842; --panel:#242c35; --panel-2:#1f252c; --line:#3c4550;
@@ -420,6 +424,76 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    
+    /* ===== 웹캠 시선 추적 컨테이너 ===== */
+    #webcam-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 200px;
+      height: 150px;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      z-index: 999;
+      display: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      border: 2px solid rgba(31,144,255,0.3);
+    }
+    
+    #webcam-container.active {
+      display: block;
+    }
+    
+    #webcam-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    #webcam-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    
+    #attention-indicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 5px 10px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      font-size: 12px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    
+    #attention-value {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    
+    #webcam-toggle {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 4px 8px;
+      background: rgba(31,144,255,0.8);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 10px;
+      z-index: 1000;
+    }
+    
+    #webcam-toggle:hover {
+      background: rgba(31,144,255,1);
+    }
   </style>
 </head>
 <body class="generic-page content-page">
@@ -427,6 +501,16 @@
   <div id="page-wrapper" data-header-loaded="true">
     <!-- Header Fragment -->
     <div th:replace="~{fragments/header :: header}"></div>
+  </div>
+  
+  <!-- 웹캠 시선 추적 컨테이너 -->
+  <div id="webcam-container">
+    <video id="webcam-video" autoplay playsinline></video>
+    <canvas id="webcam-canvas"></canvas>
+    <div id="attention-indicator">
+      집중도: <span id="attention-value">0%</span>
+    </div>
+    <button id="webcam-toggle">숨기기</button>
   </div>
   
   <!-- 사이드바 토글 버튼 -->
@@ -448,7 +532,7 @@
       <div class="viewer-inner">
         <div class="preview-area" id="preview-area">
           <div id="video-wrapper" style="position:relative; max-width:100%; max-height:100%; display:flex; align-items:center; justify-content:center;">
-            <img id="preview-media" alt="video preview" src="https://via.placeholder.com/800x450/2e3842/9fb3c8?text=%EC%98%81%EC%83%81%EC%9D%84+%EC%84%A0%ED%83%9D%ED%95%98%EC%84%B8%EC%9A%94"/>
+            <img id="preview-media" alt="video preview" src="/images/banner.png"/>
           </div>
         </div>
 
@@ -470,8 +554,8 @@
           <div class="empty-state">
             <div class="empty-state-icon">📚</div>
             <div>영상을 선택하세요</div>
-          </div>
-        </div>
+    </div>
+  </div>
       </aside>
     </div>
   </div>
@@ -502,6 +586,16 @@
     let explanationQueue = []; // ★ NEW: 설명 요청 큐
     let isProcessingExplanation = false; // ★ NEW: 큐 처리 중 플래그
     let hasUserStartedPlayback = false; // ★ NEW: 사용자가 재생을 시작했는지 여부
+    
+    // ===== 시선 추적 변수 =====
+    let faceMesh = null;
+    // let camera = null; // ★ MediaPipe Camera 유틸리티 미사용 (getUserMedia 직접 사용)
+    let isTracking = false;
+    let currentChapterAttention = { onScreen: 0, total: 0 };
+    let lastActiveChapter = -1; // 마지막으로 활성화된 챕터 인덱스
+    let chapterFocusedTime = 0; // ★ NEW: 시선이 화면에 있을 때의 시청 시간
+    let lastUpdateTime = 0; // ★ NEW: 마지막 업데이트 시간
+    let lastGazeState = false; // ★ NEW: 마지막 시선 상태 (화면 주시 여부)
 
     /* ===== 유틸 함수 ===== */
     function formatTime(seconds) {
@@ -612,6 +706,10 @@
       try {
         console.log('📂 영상 로드:', storedName);
         
+        // ★ NEW: 이전 영상의 마지막 챕터 집중도 저장
+        console.log('📂 새 영상 로드 - 이전 챕터 집중도 저장');
+        await saveCurrentChapterAttention();
+        
         // ★ NEW: 플래그 초기화
         hasUserStartedPlayback = false;
         
@@ -653,19 +751,44 @@
         duration = video.duration;
         updateTimeLabel(0, duration);
         
-        // ★ NEW: 영상 재생 중 활성 챕터 추적 변수
-        let lastActiveChapter = -1;
-        
         // ★ NEW: 사용자가 재생 버튼을 누를 때 플래그 설정 및 챕터 리셋
-        videoEl.addEventListener('play', () => {
+        videoEl.addEventListener('play', async () => {
           hasUserStartedPlayback = true;
           lastActiveChapter = -1; // ★ 리셋하여 첫 챕터 재감지
+          resetChapterAttention(); // 집중도 카운터 리셋
           console.log('▶️ 재생 시작 - 자동 로드 활성화 (lastActiveChapter 리셋)');
+          
+          // ★ NEW: 권한 확인 후 시선 추적 시작
+          if (!isTracking) {
+            const canTrack = await checkUserTypeForWebcam();
+            if (canTrack) {
+              await initGazeTracking();
+            } else {
+              console.log('⚠️ 학생 계정은 집중도 측정을 할 수 없습니다.');
+            }
+          }
         }, { once: true });
         
-        // ★ NEW: 영상 재생 중 활성 챕터 UI 업데이트
-        videoEl.addEventListener('timeupdate', () => {
+        // ★ NEW: 영상 종료 시 마지막 챕터 집중도 저장
+        videoEl.addEventListener('ended', async () => {
+          console.log('🏁 영상 종료 - 마지막 챕터 집중도 저장');
+          await saveCurrentChapterAttention();
+        });
+        
+        // ★ NEW: 영상 재생 중 활성 챕터 UI 업데이트 및 시청 시간 누적
+        videoEl.addEventListener('timeupdate', async () => {
           const currentTime = videoEl.currentTime;
+          
+          // ★ NEW: 시청 시간 누적 (재생 중 + 시선이 화면에 있을 때만)
+          if (!videoEl.paused && lastUpdateTime > 0) {
+            const delta = currentTime - lastUpdateTime;
+            if (delta > 0 && delta < 2) {  // 정상 범위 (시크 제외)
+              if (lastGazeState) {  // 시선이 화면에 있었다면
+                chapterFocusedTime += delta;
+              }
+            }
+          }
+          lastUpdateTime = currentTime;
           
           // 현재 재생 시점이 속한 챕터 찾기
           const activeChapterIdx = currentChapters.findIndex(ch => 
@@ -674,7 +797,14 @@
           
           // 챕터가 변경되었을 때만 처리
           if (activeChapterIdx !== -1 && activeChapterIdx !== lastActiveChapter) {
+            // ★ 이전 챕터의 집중도 저장 (상세 설명 로드 전)
+            if (lastActiveChapter >= 0 && currentChapters[lastActiveChapter]) {
+              await saveCurrentChapterAttention();
+            }
+            
+            // 새 챕터로 전환
             lastActiveChapter = activeChapterIdx;
+            resetChapterAttention(); // 새 챕터의 집중도 카운터 리셋
             
             // ★ 활성 챕터 UI 업데이트 + 조건부 자동 설명 로드
             document.querySelectorAll('.chapter-card').forEach(card => {
@@ -701,6 +831,7 @@
         
         // 챕터 데이터 변환
         currentChapters = chapters.map(ch => ({
+          chapterId: ch.chapterId, // ★ NEW: 집중도 저장을 위한 챕터 ID
           start: ch.startTime,
           end: ch.endTime,
           title: ch.title,
@@ -1025,6 +1156,191 @@
         // ★ 로딩 플래그 해제
         detailDiv.dataset.loading = 'false';
       }
+    }
+    
+    /* ===== 시선 추적 초기화 및 제어 ===== */
+    async function initGazeTracking() {
+      console.log('👁️ MediaPipe 시선 추적 초기화 중...');
+      
+      const webcamVideo = document.getElementById('webcam-video');
+      const webcamContainer = document.getElementById('webcam-container');
+      
+      try {
+        // 1. 브라우저에서 웹캠 스트림 직접 요청
+        console.log('📷 웹캠 권한 요청 중...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: 640,
+            height: 480,
+            facingMode: 'user'
+          }
+        });
+        
+        // 2. 비디오 요소에 스트림 연결
+        webcamVideo.srcObject = stream;
+        await webcamVideo.play();
+        console.log('✅ 웹캠 스트림 연결 완료');
+        
+        // 3. MediaPipe FaceMesh 초기화
+        faceMesh = new FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+        
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        
+        faceMesh.onResults(onFaceMeshResults);
+        
+        // 4. requestAnimationFrame으로 프레임 처리
+        const sendFrame = async () => {
+          if (isTracking && faceMesh && webcamVideo.readyState === webcamVideo.HAVE_ENOUGH_DATA) {
+            await faceMesh.send({image: webcamVideo});
+          }
+          if (isTracking) {
+            requestAnimationFrame(sendFrame);
+          }
+        };
+        
+        webcamContainer.classList.add('active');
+        isTracking = true;
+        sendFrame(); // 프레임 처리 시작
+        
+        console.log('✅ 시선 추적 시작');
+        
+      } catch (error) {
+        console.error('❌ 시선 추적 초기화 실패:', error);
+        
+        // 오류 타입별 메시지
+        if (error.name === 'NotAllowedError') {
+          console.warn('⚠️ 웹캠 권한이 거부되었습니다.');
+        } else if (error.name === 'NotFoundError') {
+          console.warn('⚠️ 웹캠 장치를 찾을 수 없습니다.');
+        } else if (error.name === 'NotReadableError') {
+          console.warn('⚠️ 웹캠이 다른 프로그램에서 사용 중입니다.');
+        } else {
+          console.warn('⚠️ 웹캠을 사용할 수 없습니다. 집중도 측정이 비활성화됩니다.');
+        }
+      }
+    }
+    
+    function onFaceMeshResults(results) {
+      if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+        // 얼굴 미감지 = 화면에서 시선 벗어남
+        lastGazeState = false; // ★ NEW
+        currentChapterAttention.total++;
+        updateAttentionIndicator(false);
+        return;
+      }
+      
+      // 얼굴 감지됨 = 화면 주시 중
+      lastGazeState = true; // ★ NEW
+      currentChapterAttention.onScreen++;
+      currentChapterAttention.total++;
+      updateAttentionIndicator(true);
+    }
+    
+    function updateAttentionIndicator(isOnScreen) {
+      const indicator = document.getElementById('attention-value');
+      if (!indicator) return;
+      
+      const score = currentChapterAttention.total > 0 
+        ? (currentChapterAttention.onScreen / currentChapterAttention.total * 100).toFixed(0)
+        : 0;
+      
+      indicator.textContent = score + '%';
+      indicator.style.color = isOnScreen ? '#4ade80' : '#f87171';
+    }
+    
+    /* ===== 현재 챕터 집중도 저장 (새로운 계산 방식) ===== */
+    async function saveCurrentChapterAttention() {
+      if (lastActiveChapter < 0 || !currentChapters[lastActiveChapter]) return;
+      
+      const chapter = currentChapters[lastActiveChapter];
+      const chapterDuration = chapter.end - chapter.start;
+      
+      // ★ NEW: 집중도 = 시선 고정 시청 시간 / 구간 전체 시간
+      const attentionScore = chapterDuration > 0 
+        ? Math.min(chapterFocusedTime / chapterDuration, 1.0)
+        : 0;
+      
+      console.log(`💾 챕터 ${lastActiveChapter + 1} 집중도 저장`);
+      console.log(`  - 시선 고정 시청: ${chapterFocusedTime.toFixed(1)}s`);
+      console.log(`  - 구간 전체 시간: ${chapterDuration.toFixed(1)}s`);
+      console.log(`  - 집중도: ${(attentionScore * 100).toFixed(1)}%`);
+      
+      if (chapter.chapterId && attentionScore > 0) {
+        await saveChapterAttention(chapter.chapterId, attentionScore);
+      }
+    }
+    
+    async function saveChapterAttention(chapterId, attentionScore) {
+      if (!chapterId || attentionScore === null || attentionScore === undefined) {
+        console.log('⚠️ 집중도 저장 스킵: 유효하지 않은 데이터');
+        return;
+      }
+      
+      console.log(`💾 집중도 저장 요청: 챕터 ${chapterId}, 점수 ${attentionScore.toFixed(3)}`);
+      
+      try {
+        const response = await fetch('/api/attention/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chapterId: chapterId,
+            attentionScore: attentionScore
+          })
+        });
+        
+        if (!response.ok) throw new Error('집중도 저장 실패');
+        
+        const data = await response.json();
+        console.log('✅ 집중도 저장 완료:', data);
+      } catch (error) {
+        console.error('❌ 집중도 저장 실패:', error);
+      }
+    }
+    
+    function resetChapterAttention() {
+      currentChapterAttention = { onScreen: 0, total: 0 };
+      chapterFocusedTime = 0; // ★ NEW
+      lastUpdateTime = 0; // ★ NEW
+      lastGazeState = false; // ★ NEW
+      console.log('🔄 집중도 카운터 리셋');
+    }
+    
+    /* ===== 사용자 유형 확인 (웹캠 권한 체크) ===== */
+    async function checkUserTypeForWebcam() {
+      try {
+        const response = await fetch('/api/auth/user-type');
+        const data = await response.json();
+        const canTrack = data.userType === 'admin' || data.userType === 'teacher';
+        console.log(`👤 사용자 타입: ${data.userType}, 웹캠 권한: ${canTrack}`);
+        return canTrack;
+      } catch (error) {
+        console.error('사용자 타입 확인 실패:', error);
+        return false;
+      }
+    }
+    
+    // 웹캠 토글 버튼
+    const webcamToggle = document.getElementById('webcam-toggle');
+    if (webcamToggle) {
+      webcamToggle.addEventListener('click', () => {
+        const container = document.getElementById('webcam-container');
+        if (container.classList.contains('active')) {
+          container.classList.remove('active');
+          isTracking = false;
+          webcamToggle.textContent = '보이기';
+        } else {
+          container.classList.add('active');
+          isTracking = true;
+          webcamToggle.textContent = '숨기기';
+        }
+      });
     }
     
     /* ===== 초기화 ===== */

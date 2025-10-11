@@ -48,7 +48,7 @@ class Settings:
             HF_LOAD_IN_4BIT=os.getenv("HF_LOAD_IN_4BIT", "true").lower() in ("1","true","yes"), # HF_LOAD_IN_4BIT false -> cpu
             HF_MAX_NEW_TOKENS=int(os.getenv("HF_MAX_NEW_TOKENS", "2048")),
             HF_TEMPERATURE=float(os.getenv("HF_TEMPERATURE", "0.2")),
-                    HF_TOKEN=os.getenv("HF_TOKEN", "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"),
+            HF_TOKEN=os.getenv("HF_TOKEN", "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"),
 
             HF_MAX_GPU_MEMORY=os.getenv("HF_MAX_GPU_MEMORY", "16GiB"),  # GPU 메모리 증가
             HF_MAX_CPU_MEMORY=os.getenv("HF_MAX_CPU_MEMORY", "32GiB"),  # CPU 메모리 감소
