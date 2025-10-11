@@ -30,3 +30,4 @@ requests>=2.31
 sentence-transformers>=2.2.0
 faiss-cpu>=1.7.4
 wikipedia>=1.4.0
+konlpy>=0.6.0

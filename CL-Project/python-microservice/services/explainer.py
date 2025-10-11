@@ -96,7 +96,7 @@ Analyze and explain in {lang_name}:
     outputs = pipe(
         explanation_prompt,
         max_new_tokens=400,
-        temperature=0.27
+        temperature=0.25
     )
     explanation = _extract_text(outputs).strip()
     

@@ -72,4 +72,27 @@ public class FlaskClient {
     }
     return mapper.readTree(resp.getBody());
   }
+
+  /** /chat (AI Agent + RAG 챗봇) */
+  public JsonNode chat(String storedName, String segmentsJson, String question, String lang) throws Exception {
+    String base = flaskUrl.endsWith("/") ? flaskUrl : flaskUrl + "/";
+    String url = base + "chat";
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+
+    // JSON 요청 바디 생성
+    String requestBody = String.format(
+      "{\"stored_name\": \"%s\", \"segments\": %s, \"question\": \"%s\", \"lang\": \"%s\"}",
+      storedName, segmentsJson, question, lang != null ? lang : "ko"
+    );
+
+    HttpEntity<String> req = new HttpEntity<>(requestBody, headers);
+    ResponseEntity<String> resp = restTemplate.postForEntity(url, req, String.class);
+
+    if (!resp.getStatusCode().is2xxSuccessful()) {
+      throw new RuntimeException("Flask 챗봇 오류: " + resp.getStatusCode() + " " + resp.getBody());
+    }
+    return mapper.readTree(resp.getBody());
+  }
 }

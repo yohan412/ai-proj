@@ -140,5 +140,68 @@ public class AnalyzeController {
       return ResponseEntity.status(500).body(errorResponse);
     }
   }
+
+  /**
+   * AI 챗봇 질의응답
+   * 요청: { "stored_name": "...", "segments": [...], "question": "...", "lang": "ko" }
+   * 응답: { "answer": "...", "sources": [...], "thinking_steps": [] }
+   */
+  @PostMapping(
+      value = "/chat",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE
+  )
+  public ResponseEntity<?> chat(@RequestBody Map<String, Object> requestBody) {
+    try {
+      System.out.println("🤖 챗봇 질문 요청");
+      
+      String storedName = (String) requestBody.get("stored_name");
+      String question = (String) requestBody.get("question");
+      String lang = (String) requestBody.getOrDefault("lang", "ko");
+      
+      String segmentsJson = new com.fasterxml.jackson.databind.ObjectMapper()
+          .writeValueAsString(requestBody.get("segments"));
+      
+      System.out.println("  - stored_name: " + storedName);
+      System.out.println("  - question: " + question);
+      
+      // Flask로 요청 전달
+      JsonNode response = flaskClient.chat(storedName, segmentsJson, question, lang);
+      
+      // 응답 파싱
+      Map<String, Object> result = new HashMap<>();
+      result.put("answer", response.path("answer").asText(""));
+      
+      // sources 배열
+      List<Map<String, Object>> sources = new ArrayList<>();
+      if (response.has("sources")) {
+        for (JsonNode src : response.get("sources")) {
+          Map<String, Object> sourceMap = new HashMap<>();
+          sourceMap.put("start", src.path("start").asDouble(0.0));
+          sourceMap.put("end", src.path("end").asDouble(0.0));
+          sourceMap.put("text", src.path("text").asText(""));
+          sourceMap.put("score", src.path("score").asDouble(0.0));
+          sources.add(sourceMap);
+        }
+      }
+      result.put("sources", sources);
+      result.put("thinking_steps", new ArrayList<>());
+      
+      System.out.println("✅ 챗봇 응답 완료");
+      
+      return ResponseEntity.ok(result);
+      
+    } catch (Exception e) {
+      System.err.println("❌ 챗봇 응답 실패: " + e.getMessage());
+      e.printStackTrace();
+      
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put("answer", "죄송합니다. 답변 생성 중 오류가 발생했습니다.");
+      errorResponse.put("error", e.getMessage());
+      errorResponse.put("sources", new ArrayList<>());
+      errorResponse.put("thinking_steps", new ArrayList<>());
+      return ResponseEntity.status(500).body(errorResponse);
+    }
+  }
 }
 
