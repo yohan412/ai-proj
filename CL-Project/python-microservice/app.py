@@ -334,5 +334,71 @@ def explain_chapter():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.post("/chat")
+def chat():
+    """AI Agent 챗봇 - RAG 기반 질의응답"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "no JSON data"}), 400
+        
+        stored_name = data.get("stored_name")
+        segments = data.get("segments", [])
+        question = data.get("question")
+        lang = data.get("lang", "ko")
+        
+        print(f"\n[챗봇 질문]")
+        print(f"  - stored_name: {stored_name}")
+        print(f"  - question: {question}")
+        print(f"  - lang: {lang}")
+        print(f"  - segments: {len(segments)}개")
+        
+        if not stored_name:
+            return jsonify({"error": "stored_name is required"}), 400
+        
+        if not question:
+            return jsonify({"error": "question is required"}), 400
+        
+        if not segments:
+            return jsonify({"error": "segments is required"}), 400
+        
+        # LLM 파이프라인 로드
+        pipe = _get_pipe(
+            model_id=cfg.HF_MODEL_ID,
+            load_in_4bit=cfg.HF_LOAD_IN_4BIT,
+            temperature=0.5,
+            max_new_tokens=300,
+            hf_token=cfg.HF_TOKEN,
+            max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
+            max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
+            offload_dir=cfg.HF_OFFLOAD_DIR,
+            low_cpu_mem=cfg.HF_LOW_CPU_MEM,
+            torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
+        )
+        
+        if pipe is None:
+            return jsonify({"error": "LLM pipeline initialization failed"}), 500
+        
+        # Simple QA
+        from services.agent_service import create_simple_qa
+        result = create_simple_qa(pipe, stored_name, segments, question, lang)
+        
+        print(f"\n[챗봇 응답 완료]")
+        print(f"  - answer: {result['answer'][:100]}...")
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"[오류] 챗봇 응답 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "answer": f"죄송합니다. 답변 생성 중 오류가 발생했습니다: {str(e)}",
+            "sources": [],
+            "thinking_steps": [],
+            "error": str(e)
+        }), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)

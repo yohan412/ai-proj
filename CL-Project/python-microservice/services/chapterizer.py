@@ -294,20 +294,43 @@ Return ONLY the JSON with time boundaries.
     print(text)
     print("=" * 80)
     
-    # JSON 파싱
-    json_text = text
-    json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)  # 마지막 쉼표 제거
-    
+    # ★ 강화된 JSON 파싱 로직
     try:
-        json_start = text.find('{')
-        if json_start == -1:
-            # { 없으면 시작 부분 추가
-            json_text = '{"boundaries": [' + text
-        else:
-            json_end = text.rfind('}') + 1
-            if json_end > json_start:
-                json_text = text[json_start:json_end]
+        # 1. 불필요한 공백/개행 제거
+        json_text = text.strip()
         
+        # 2. 배열 형식 정규화
+        json_text = re.sub(r',\s*]', ']', json_text)  # 마지막 쉼표 제거
+        json_text = re.sub(r',\s*}', '}', json_text)  # 객체 마지막 쉼표 제거
+        
+        # 3. 배열 중간 부분 처리 ({ 로 시작하고 ] 로 끝나는 경우)
+        if json_text.startswith('{') and json_text.endswith(']'):
+            # 배열 중간이므로 [ 추가
+            json_text = '[' + json_text
+        
+        # 4. boundaries 키 확인 및 추가
+        if not json_text.startswith('{"boundaries"'):
+            if json_text.startswith('['):
+                # [로 시작하면 boundaries로 감싸기
+                json_text = '{"boundaries": ' + json_text + '}'
+            elif json_text.startswith('{'):
+                # {로 시작하는데 boundaries가 없으면 그대로 시도
+                pass
+            else:
+                # 아무것도 아니면 boundaries로 감싸기
+                json_text = '{"boundaries": [' + json_text
+        
+        # 5. 끝 부분 정리
+        if not json_text.endswith('}'):
+            if json_text.endswith(']'):
+                json_text = json_text + '}'
+            elif json_text.endswith(']}'):
+                # 이미 완료된 형태
+                pass
+            else:
+                json_text = json_text + ']}'
+        
+        # 6. 파싱
         obj = json.loads(json_text)
         boundaries = obj.get("boundaries", [])
         
@@ -411,8 +434,8 @@ def _generate_chapter_metadata(segments: List[Dict[str, Any]], start: float, end
         prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 당신은 교육 컨텐츠 요약 전문가입니다. 주어진 자막을 읽고 다음을 생성하세요:
-1. 짧은 제목 (3-5단어) - 반드시 한글로만 작성
-2. 간단한 요약 (1-2문장) - 반드시 한글로만 작성
+1. 제목 (3-5단어) - 반드시 한글로만 작성
+2. 요약 (1-2문장) - 반드시 한글로만 작성
 
 중요 규칙:
 - 영어 단어를 절대 사용하지 마세요
@@ -425,7 +448,7 @@ def _generate_chapter_metadata(segments: List[Dict[str, Any]], start: float, end
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 자막 내용:
-{transcript[:800]}
+{transcript[:1200]}
 
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
@@ -446,7 +469,7 @@ Return ONLY this JSON:
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Subtitles:
-{transcript[:800]}
+{transcript[:1200]}
 
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
@@ -458,36 +481,56 @@ Subtitles:
     outputs = pipe(
         prompt, 
         max_new_tokens=200, 
-        temperature=0.27
+        temperature=0.3
     )
     text = _extract_text(outputs)
     
     print(f"[2단계] LLM 응답 (첫 200자): {text[:200]}")
     
-    # JSON 파싱
-    json_text = text
-    json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)  # 마지막 쉼표 제거
-    
+    # ★ 강화된 JSON 파싱 로직
     try:
-        # JSON 추출
-        json_start = text.find('{')
-        if json_start == -1:
-            # { 없으면 시작부터 JSON이라고 가정
-            json_text = '{"title": "' + text
-        else:
-            json_end = text.rfind('}') + 1
-            if json_end > json_start:
-                json_text = text[json_start:json_end]
+        # 1. 따옴표로 시작하는 문자열 처리 ("주제" 형식)
+        if text.startswith('"') and not text.startswith('{'):
+            # "문자열" → {"title": "문자열", "summary": "문자열"}
+            cleaned = text.strip('"')
+            print(f"[chapterizer] ✅ 따옴표 문자열 처리 - 제목: {cleaned[:50]}")
+            return {"title": cleaned, "summary": cleaned}
         
-        obj = json.loads(json_text)
-        title = obj.get("title", "").strip()
-        summary = obj.get("summary", "").strip()
+        # 2. JSON 추출 강화
+        json_text = text.strip()
+        json_text = re.sub(r',\s*}', '}', json_text)  # 마지막 쉼표 제거
         
-        if title and summary:
-            print(f"[chapterizer] ✅ JSON 파싱 성공 - 제목: {title[:50]}")
-            return {"title": title, "summary": summary}
+        # 3. Unterminated string 처리 ("}가 없으면 추가)
+        if json_text.startswith('{') and not json_text.endswith('}'):
+            # "summary": "텍스트... 형태에서 " 추가
+            if '"summary"' in json_text and json_text.count('"') % 2 == 1:
+                json_text = json_text + '"}'
+            else:
+                json_text = json_text + '}'
+        
+        # 4. { 앞의 모든 문자 제거
+        json_start = json_text.find('{')
+        if json_start > 0:
+            json_text = json_text[json_start:]
+        
+        # 5. } 뒤의 모든 문자 제거
+        json_end = json_text.rfind('}')
+        if json_end != -1:
+            json_text = json_text[:json_end+1]
+        
+        # 6. JSON 파싱
+        if json_text:
+            obj = json.loads(json_text)
+            title = obj.get("title", "").strip()
+            summary = obj.get("summary", "").strip()
+            
+            if title and summary:
+                print(f"[chapterizer] ✅ JSON 파싱 성공 - 제목: {title[:50]}")
+                return {"title": title, "summary": summary}
+            else:
+                raise ValueError("제목 또는 요약 비어있음")
         else:
-            raise ValueError("제목 또는 요약 비어있음")
+            raise ValueError("JSON 추출 실패")
             
     except Exception as e:
         print(f"[chapterizer] ⚠️ JSON 파싱 실패: {e}, Regex fallback 시도...")
