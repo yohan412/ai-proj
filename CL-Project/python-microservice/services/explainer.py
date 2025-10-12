@@ -1,6 +1,7 @@
 # services/explainer.py
 from typing import List, Dict, Any, Optional
 from services.chapterizer import _lang_label_from_code  # ★ chapterizer에서 import
+from utils.helpers import remove_duplicate_sentences, trim_incomplete_last_sentence
 
 def generate_explanation(
     *,
@@ -92,13 +93,18 @@ Analyze and explain in {lang_name}:
 
 """
     
-    # LLM으로 설명 생성 (최적 파라미터: temperature=0.27)
+    # LLM으로 설명 생성 (최적 파라미터: temperature=0.25)
     outputs = pipe(
         explanation_prompt,
         max_new_tokens=400,
         temperature=0.25
     )
     explanation = _extract_text(outputs).strip()
+    
+    # 1. 반복 문장 제거
+    explanation = remove_duplicate_sentences(explanation)
+    # 2. 미완성 문장 제거
+    explanation = trim_incomplete_last_sentence(explanation)
     
     print(f"[LLM 생성 완료]")
     print(f"  - 설명 ({lang_name}, {len(explanation)}자): {explanation[:100]}...")

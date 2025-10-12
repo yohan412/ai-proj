@@ -29,6 +29,7 @@ os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
 from config import Settings
 from services.transcriber import transcribe_file
 from services.chapterizer import make_chapters_hf, _get_pipe, _extract_text
+from utils.helpers import trim_incomplete_last_sentence
 
 # (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
 # try:
@@ -269,31 +270,6 @@ def clip_video():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-def trim_incomplete_last_sentence(text):
-    """마지막 마침표(.)나 느낌표(!)로 끝나지 않은 문장 제거"""
-    if not text:
-        return text
-    
-    # 유효한 문장 종결 부호: . 또는 !만 허용 (? 제외)
-    last_period = text.rfind('.')
-    last_exclamation = text.rfind('!')
-    
-    # 가장 마지막 유효한 문장 종결 부호의 위치
-    last_sentence_end = max(last_period, last_exclamation)
-    
-    # 유효한 문장 종결 부호가 없으면 빈 문자열 반환
-    if last_sentence_end == -1:
-        return ""
-    
-    # 마지막 유효한 문장 종결 부호 뒤의 텍스트 확인
-    after_last = text[last_sentence_end + 1:].strip()
-    
-    # 뒤에 텍스트가 있으면 (미완성 문장) 잘라냄
-    if after_last:
-        return text[:last_sentence_end + 1].strip()
-    
-    return text
-
 @app.post("/explain")
 def explain_chapter():
     """챕터 구간에 대한 상세 설명 생성 API"""
@@ -348,11 +324,9 @@ def explain_chapter():
         
         print(f"\n[상세 설명 생성 완료]\n")
         
-        # 미완성 문장 제거
-        cleaned_explanation = trim_incomplete_last_sentence(explanation)
-        
+        # explainer.py에서 이미 처리됨 (반복 문장 제거 + 미완성 문장 제거)
         return jsonify({
-            "explanation": cleaned_explanation,
+            "explanation": explanation,
             "segment_count": len(segments)
         })
         

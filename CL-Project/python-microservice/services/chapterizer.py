@@ -9,7 +9,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from transformers import BitsAndBytesConfig        # ★ NEW: BnB 4bit 설정 사용
 from transformers import AutoConfig                # ★ NEW: 레포 config 로드 후 mxfp4 설정 제거
 
-from utils.helpers import round_time, ensure_json
+from utils.helpers import round_time, ensure_json, remove_duplicate_sentences, trim_incomplete_last_sentence
 
 # Windows 한글 인코딩은 app.py에서 처리됨
 
@@ -475,7 +475,7 @@ def _generate_chapter_metadata(segments: List[Dict[str, Any]], start: float, end
    - 반드시 순수 한글만 사용
 2. 요약
    - 반드시 1문장 또는 2문장만 작성
-   - 1문장일 경우 전체 길이 80~120자
+   - 1문장일 경우 전체 길이 30~120자
    - 2문장일 경우 각 문장은 40~60자, 두 문장의 합은 80~120자
    - 마침표(.)는 최대 두 번까지만 허용
    - 한 번 언급한 내용은 반복하지 말 것
@@ -535,12 +535,12 @@ Subtitles:
     
     print(f"[2단계] 자막 길이: {len(transcript)}자, 프롬프트 길이: {len(prompt)}자", flush=True)
     
-    # ★ 최적 파라미터: temperature=0.27 (반복 방지 + 영어 혼재 최소화)
+    # ★ 최적 파라미터: temperature=0.25 (반복 방지 + 영어 혼재 최소화)
     outputs = pipe(
         prompt, 
         max_new_tokens=200, 
         temperature=0.25,
-        repetition_penalty=1.1,
+        repetition_penalty=1.05,
         top_p=0.9,
     )
     text = _extract_text(outputs)
@@ -600,6 +600,11 @@ Subtitles:
             title = obj.get("title", "").strip()
             summary = obj.get("summary", "").strip()
             
+            # 1. 반복 문장 제거
+            summary = remove_duplicate_sentences(summary)
+            # 2. 미완성 문장 제거
+            summary = trim_incomplete_last_sentence(summary)
+            
             if title and summary:
                 print(f"[chapterizer] ✅ JSON 파싱 성공 - 제목: {title[:50]}", flush=True)
                 return {"title": title, "summary": summary}
@@ -618,6 +623,12 @@ Subtitles:
         if title_match and summary_match:
             title = title_match.group(1).strip()
             summary = summary_match.group(1).strip()
+            
+            # 1. 반복 문장 제거
+            summary = remove_duplicate_sentences(summary)
+            # 2. 미완성 문장 제거
+            summary = trim_incomplete_last_sentence(summary)
+            
             print(f"[chapterizer] ✅ Regex 파싱 성공 - 제목: {title[:50]}", flush=True)
             return {"title": title, "summary": summary}
         
