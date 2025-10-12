@@ -511,6 +511,7 @@
       align-items: center;
       justify-content: center;
       transition: all 0.3s;
+      box-shadow: none;
     }
     .chatbot-toggle:hover {
       transform: scale(1.15);
@@ -814,7 +815,7 @@
       <div class="viewer-inner">
         <div class="preview-area" id="preview-area">
           <div id="video-wrapper" style="position:relative; max-width:100%; max-height:100%; display:flex; align-items:center; justify-content:center;">
-            <img id="preview-media" alt="video preview" src="/images/banner.png"/>
+            <div style="color: var(--muted); font-size: 16px;">video preview</div>
           </div>
         </div>
 
@@ -1042,11 +1043,11 @@
           
           // ★ NEW: 권한 확인 후 시선 추적 시작
           if (!isTracking) {
-            const canTrack = await checkUserTypeForWebcam();
+            const { canTrack, showWebcam } = await checkUserTypeForWebcam();
             if (canTrack) {
-              await initGazeTracking();
+              await initGazeTracking(showWebcam);
             } else {
-              console.log('⚠️ 학생 계정은 집중도 측정을 할 수 없습니다.');
+              console.log('⚠️ 집중도 측정을 시작할 수 없습니다.');
             }
           }
         }, { once: true });
@@ -1441,7 +1442,7 @@
     }
     
     /* ===== 시선 추적 초기화 및 제어 ===== */
-    async function initGazeTracking() {
+    async function initGazeTracking(showWebcam = false) {
       console.log('👁️ MediaPipe 시선 추적 초기화 중...');
       
       const webcamVideo = document.getElementById('webcam-video');
@@ -1487,7 +1488,14 @@
           }
         };
         
-        webcamContainer.classList.add('active');
+        // showWebcam 파라미터에 따라 admin만 웹캠 화면 표시
+        if (showWebcam) {
+          webcamContainer.classList.add('active');
+          console.log('📹 웹캠 프리뷰 활성화 (admin)');
+        } else {
+          console.log('👁️ 웹캠 프리뷰 숨김 (student/teacher)');
+        }
+        
         isTracking = true;
         sendFrame(); // 프레임 처리 시작
         
@@ -1599,12 +1607,19 @@
       try {
         const response = await fetch('/api/auth/user-type');
         const data = await response.json();
-        const canTrack = data.userType === 'admin' || data.userType === 'teacher';
-        console.log(`👤 사용자 타입: ${data.userType}, 웹캠 권한: ${canTrack}`);
-        return canTrack;
+        const userType = data.userType;
+        
+        console.log(`👤 사용자 타입: ${userType}`);
+        
+        // 모든 사용자가 집중도 측정 가능
+        // 하지만 웹캠 화면은 admin만 표시
+        return {
+          canTrack: true,  // 모든 타입 집중도 측정 허용
+          showWebcam: userType === 'admin'  // admin만 웹캠 화면 표시
+        };
       } catch (error) {
         console.error('사용자 타입 확인 실패:', error);
-        return false;
+        return { canTrack: false, showWebcam: false };
       }
     }
     
