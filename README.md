@@ -1,4 +1,4 @@
-# AIkademia (ai-proj)
+# AIkademia
 
 교육용 영상을 업로드하면 AI가 **자막 추출 → 챕터 분할 → 구간 설명 → RAG 질의응답**까지 수행하는 생성형 AI 학습 플랫폼입니다.  
 시선 추적 기반 **집중도(Attention)** 기록으로 학습 상태를 함께 관리합니다.
@@ -20,11 +20,13 @@ Spring Boot (:8181)  ──JDBC──►  Oracle DB (:1521)
                       └─ RAG + Wikipedia Agent     챗봇 Q&A
 ```
 
-| 구성 요소 | 역할 | 기본 포트 |
-|-----------|------|-----------|
-| **Spring Boot** (`CL-Project`) | 웹 UI, 인증, 영상/집중도 API, Flask 연동 | `8181` |
-| **Python Flask** (`python-microservice`) | 영상 분석·LLM·RAG 마이크로서비스 | `5001` |
-| **Oracle Database** | 사용자, 영상, 챕터, 집중도 데이터 | `1521` |
+
+| 구성 요소                                    | 역할                             | 기본 포트  |
+| ---------------------------------------- | ------------------------------ | ------ |
+| **Spring Boot** (`CL-Project`)           | 웹 UI, 인증, 영상/집중도 API, Flask 연동 | `8181` |
+| **Python Flask** (`python-microservice`) | 영상 분석·LLM·RAG 마이크로서비스          | `5001` |
+| **Oracle Database**                      | 사용자, 영상, 챕터, 집중도 데이터           | `1521` |
+
 
 ---
 
@@ -43,18 +45,21 @@ Spring Boot (:8181)  ──JDBC──►  Oracle DB (:1521)
 ## 기술 스택
 
 ### Backend (Java)
+
 - Java 17+, Spring Boot 3.3.5
 - Spring Security, Spring Data JPA, Thymeleaf
 - WebClient / RestTemplate → Flask 연동
 - Oracle JDBC (`ojdbc11`)
 
 ### AI Microservice (Python)
+
 - Flask, faster-whisper, PyTorch (CUDA 11.8)
 - Transformers / Hugging Face LLM (기본: 로컬 HF 모델)
 - sentence-transformers + FAISS (RAG)
 - KoNLPy, Wikipedia API
 
 ### Infra / Tools
+
 - Oracle XE (Docker 이미지 또는 로컬 설치)
 - FFmpeg (오디오 추출·영상 클립)
 - Conda (Python 환경 분리)
@@ -112,7 +117,7 @@ ai-proj/
 
 ## 빠른 시작
 
-자세한 단계는 [`CL-Project/README.md`](CL-Project/README.md)를 참고하세요.
+자세한 단계는 `[CL-Project/README.md](CL-Project/README.md)`를 참고하세요.
 
 ### 1. Oracle DB 실행
 
@@ -121,15 +126,17 @@ docker run -d --name oracle-db -p 1521:1521 laoi/cl-project-db:v1
 ```
 
 > 이미지에 테이블·시퀀스·admin 계정이 포함되어 있습니다.  
-> 로컬 Oracle을 쓰는 경우 [`CL-Project/DATABASE_SETUP.md`](CL-Project/DATABASE_SETUP.md)를 참고하세요.
+> 로컬 Oracle을 쓰는 경우 `[CL-Project/DATABASE_SETUP.md](CL-Project/DATABASE_SETUP.md)`를 참고하세요.
 
 `application.properties` 기본 접속 정보:
 
-| 항목 | 값 |
-|------|-----|
-| URL | `jdbc:oracle:thin:@localhost:1521/XEPDB1` |
-| User | `aiproj` |
-| Password | `aiproj` |
+
+| 항목       | 값                                         |
+| -------- | ----------------------------------------- |
+| URL      | `jdbc:oracle:thin:@localhost:1521/XEPDB1` |
+| User     | `aiproj`                                  |
+| Password | `aiproj`                                  |
+
 
 ### 2. Python 환경
 
@@ -187,28 +194,32 @@ mvnw.cmd spring-boot:run
 
 ### Spring Boot (`:8181`)
 
-| Method | Path | 설명 |
-|--------|------|------|
-| `POST` | `/api/auth/signup` | 회원가입 |
-| `POST` | `/api/auth/login` | 로그인 |
-| `POST` | `/api/auth/logout` | 로그아웃 |
-| `GET` | `/api/auth/session` | 세션 확인 |
-| `POST` | `/api/videos/save` | 영상·챕터 저장 |
-| `GET` | `/api/videos` | 영상 목록 |
-| `GET` | `/api/videos/stream/{storedName}` | 영상 스트리밍 |
-| `POST` | `/api/...` (AnalyzeController) | Flask 분석/설명/챗 프록시 |
-| `POST` | `/api/attention/save` | 챕터 집중도 저장 |
-| `GET` | `/api/attention/chapter/{id}/average` | 챕터 평균 집중도 |
+
+| Method | Path                                  | 설명                |
+| ------ | ------------------------------------- | ----------------- |
+| `POST` | `/api/auth/signup`                    | 회원가입              |
+| `POST` | `/api/auth/login`                     | 로그인               |
+| `POST` | `/api/auth/logout`                    | 로그아웃              |
+| `GET`  | `/api/auth/session`                   | 세션 확인             |
+| `POST` | `/api/videos/save`                    | 영상·챕터 저장          |
+| `GET`  | `/api/videos`                         | 영상 목록             |
+| `GET`  | `/api/videos/stream/{storedName}`     | 영상 스트리밍           |
+| `POST` | `/api/...` (AnalyzeController)        | Flask 분석/설명/챗 프록시 |
+| `POST` | `/api/attention/save`                 | 챕터 집중도 저장         |
+| `GET`  | `/api/attention/chapter/{id}/average` | 챕터 평균 집중도         |
+
 
 ### Flask (`:5001`)
 
-| Method | Path | 설명 |
-|--------|------|------|
-| `GET` | `/health` | 헬스체크·모델 설정 확인 |
+
+| Method | Path       | 설명                  |
+| ------ | ---------- | ------------------- |
+| `GET`  | `/health`  | 헬스체크·모델 설정 확인       |
 | `POST` | `/analyze` | Whisper + LLM 챕터 분석 |
-| `POST` | `/clip` | FFmpeg 구간 클립 |
-| `POST` | `/explain` | 챕터 상세 설명 |
-| `POST` | `/chat` | RAG 기반 AI 챗봇 |
+| `POST` | `/clip`    | FFmpeg 구간 클립        |
+| `POST` | `/explain` | 챕터 상세 설명            |
+| `POST` | `/chat`    | RAG 기반 AI 챗봇        |
+
 
 Spring → Flask URL은 `application.properties`의 `app.flask.url`로 지정합니다 (기본: `http://localhost:5001`).
 
@@ -216,11 +227,13 @@ Spring → Flask URL은 `application.properties`의 `app.flask.url`로 지정합
 
 ## 페이지 라우트
 
-| Path | 설명 |
-|------|------|
+
+| Path         | 설명             |
+| ------------ | -------------- |
 | `/`, `/main` | 랜딩 (AIkademia) |
-| `/content` | 영상 분석·학습 콘텐츠 |
-| `/manage` | 관리 페이지 |
+| `/content`   | 영상 분석·학습 콘텐츠   |
+| `/manage`    | 관리 페이지         |
+
 
 ---
 
