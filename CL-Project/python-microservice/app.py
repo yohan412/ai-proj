@@ -21,21 +21,18 @@ if sys.platform == "win32":
     os.environ['PYTHONIOENCODING'] = 'utf-8'
     os.environ['PYTHONUTF8'] = '1'  # Python 3.7+ UTF-8 모드 활성화
 
-# CUDA 라이브러리 경로 설정
-import nvidia.cublas
-cublas_bin_path = os.path.join(os.path.dirname(nvidia.cublas.__file__), 'bin')
-os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
+# CUDA 라이브러리 경로 설정. Ollama가 GPU를 쓰는 환경에서도 Flask가 뜨도록 실패는 무시한다.
+try:
+    import nvidia.cublas
+    cublas_bin_path = os.path.join(os.path.dirname(nvidia.cublas.__file__), 'bin')
+    os.environ['PATH'] = cublas_bin_path + os.pathsep + os.environ['PATH']
+except Exception as cublas_error:
+    print(f"[경고] nvidia.cublas를 불러오지 못했습니다. Whisper GPU 경로를 건너뜁니다: {cublas_error}")
 
 from config import Settings
 from services.transcriber import transcribe_file
-from services.chapterizer import make_chapters_hf, _get_pipe, _extract_text
-from utils.helpers import trim_incomplete_last_sentence
-
-# (옵션) 원격(OpenAI 호환) 쓰는 경우 유지
-# try:
-#     from services.chapterizer_remote import make_chapters as make_chapters_remote
-# except Exception:
-#     make_chapters_remote = None
+from services.chapterizer import make_chapters
+from services.ollama_client import ollama_status
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:8181", "http://127.0.0.1:8181", "http://localhost:8080", "http://127.0.0.1:8080"])  # CORS 활성화 (Spring Boot에서의 요청 허용)
@@ -43,12 +40,15 @@ cfg = Settings.from_env()
 
 @app.get("/health")
 def health():
+    status = ollama_status()
     return jsonify({
         "ok": True,
         "whisper_model": cfg.WHISPER_MODEL,
         "llm_provider": cfg.LLM_PROVIDER,
-        "hf_model_id": cfg.HF_MODEL_ID if cfg.LLM_PROVIDER == "hf_local" else None,
-        "remote_base_url": cfg.LLM_BASE_URL if cfg.LLM_PROVIDER == "remote" else None
+        "ollama_base_url": cfg.OLLAMA_BASE_URL,
+        "ollama_model": cfg.OLLAMA_MODEL,
+        "ollama_reachable": status["reachable"],
+        "ollama_model_present": status["model_present"],
     })
 
 @app.post("/analyze")
@@ -119,41 +119,20 @@ def analyze():
         if segments:
             try:
                 app.logger.info(f"Starting chapterization with {len(segments)} segments")
-                print(f"\n[챕터 분석 시작] (Llama-3.2-3B-Instruct 사용)")
-                provider = (cfg.LLM_PROVIDER or "hf_local").lower()
-                if provider == "hf_local":
-                    chapters = make_chapters_hf(
+                print(f"\n[챕터 분석 시작] (Ollama {cfg.OLLAMA_MODEL})")
+                provider = (cfg.LLM_PROVIDER or "ollama").lower()
+                if provider == "ollama":
+                    chapters = make_chapters(
                         segments=segments,
                         duration=duration,
                         lang=lang_for_chapter,
-                        model_id=cfg.HF_MODEL_ID,
-                        load_in_4bit=cfg.HF_LOAD_IN_4BIT,     # BitsAndBytesConfig 내부로만 반영됨 (경고 제거됨) ★ CHANGED
-                        temperature=cfg.HF_TEMPERATURE,
-                        max_new_tokens=cfg.HF_MAX_NEW_TOKENS,
+                        temperature=cfg.OLLAMA_TEMPERATURE,
                         max_segments_for_prompt=cfg.MAX_SEGMENTS_FOR_PROMPT,
-                        hf_token=(cfg.HF_TOKEN or None),
-                        # 메모리/오프로딩 전달
-                        max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
-                        max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
-                        offload_dir=cfg.HF_OFFLOAD_DIR,
-                        low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-                        torch_dtype_name=(cfg.HF_TORCH_DTYPE or "auto"),  # ★ CHANGED: 빈값 보호
                     )
                     app.logger.info(f"Chapterization completed. Chapters: {len(chapters)}")
-                    
-                elif provider == "remote" and make_chapters_remote is not None:
-                    chapters = make_chapters_remote(
-                        segments=segments,
-                        duration=duration,
-                        lang=lang_for_chapter,
-                        llm_base_url=cfg.LLM_BASE_URL,
-                        llm_model=cfg.LLM_MODEL,
-                        llm_api_key=cfg.LLM_API_KEY,
-                        max_segments_for_prompt=cfg.MAX_SEGMENTS_FOR_PROMPT
-                    )
                 else:
                     app.logger.warning("Unknown LLM_PROVIDER=%s; skip chapterization.", provider)
-                    print(f"[경고] 알 수 없는 LLM_PROVIDER: {provider}")
+                    print(f"[경고] 알 수 없는 LLM_PROVIDER: {provider}. ollama 만 지원합니다.")
                     chapters = []
             except Exception as e:
                 app.logger.exception("chapterization failed: %s", e)
@@ -292,34 +271,15 @@ def explain_chapter():
         if not segments:
             return jsonify({"error": "no segments provided"}), 400
         
-        # LLM 파이프라인 로드
-        pipe = _get_pipe(
-            model_id=cfg.HF_MODEL_ID,
-            load_in_4bit=cfg.HF_LOAD_IN_4BIT,
-            temperature=0.35,
-            max_new_tokens=400,
-            hf_token=cfg.HF_TOKEN,
-            max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
-            max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
-            offload_dir=cfg.HF_OFFLOAD_DIR,
-            low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-            torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
-        )
-        
-        if pipe is None:
-            return jsonify({"error": "LLM pipeline initialization failed"}), 500
-        
-        # ★ explainer 모듈 사용
         from services.explainer import generate_explanation
         
-        print(f"\n[LLM 상세 설명 생성 시작]")
+        print(f"\n[LLM 상세 설명 생성 시작] (Ollama {cfg.OLLAMA_MODEL})")
         explanation = generate_explanation(
             segments=segments,
             start_time=start_time,
             end_time=end_time,
             lang=lang,
-            pipe=pipe,
-            _extract_text=_extract_text
+            temperature=cfg.OLLAMA_EXPLAIN_TEMPERATURE,
         )
         
         print(f"\n[상세 설명 생성 완료]\n")
@@ -365,26 +325,8 @@ def chat():
         if not segments:
             return jsonify({"error": "segments is required"}), 400
         
-        # LLM 파이프라인 로드
-        pipe = _get_pipe(
-            model_id=cfg.HF_MODEL_ID,
-            load_in_4bit=cfg.HF_LOAD_IN_4BIT,
-            temperature=0.5,
-            max_new_tokens=300,
-            hf_token=cfg.HF_TOKEN,
-            max_gpu_mem=cfg.HF_MAX_GPU_MEMORY,
-            max_cpu_mem=cfg.HF_MAX_CPU_MEMORY,
-            offload_dir=cfg.HF_OFFLOAD_DIR,
-            low_cpu_mem=cfg.HF_LOW_CPU_MEM,
-            torch_dtype_name=cfg.HF_TORCH_DTYPE or "auto"
-        )
-        
-        if pipe is None:
-            return jsonify({"error": "LLM pipeline initialization failed"}), 500
-        
-        # Simple QA
         from services.agent_service import create_simple_qa
-        result = create_simple_qa(pipe, stored_name, segments, question, lang)
+        result = create_simple_qa(stored_name, segments, question, lang)
         
         print(f"\n[챗봇 응답 완료]")
         print(f"  - answer: {result['answer'][:100]}...")

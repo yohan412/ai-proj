@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 /**
  * Spring Boot Application
- * JPA 및 Oracle Database 사용
+ * JPA 및 SQLite 사용
  */
 @SpringBootApplication
 @EnableJpaRepositories(basePackages = {
@@ -16,6 +16,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 })
 public class ClProjectApplication {
     public static void main(String[] args) {
+        new java.io.File("data").mkdirs();
         SpringApplication.run(ClProjectApplication.class, args);
     }
 }

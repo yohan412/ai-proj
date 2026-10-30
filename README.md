@@ -11,11 +11,11 @@
 Browser (Thymeleaf UI)
         │
         ▼
-Spring Boot (:8181)  ──JDBC──►  Oracle DB (:1521)
+Spring Boot (:8181)  ──JDBC──►  SQLite (data/aikademia.db)
         │
         └──HTTP──►  Flask AI Microservice (:5001)
                       ├─ Whisper (faster-whisper)  자막/세그먼트
-                      ├─ Hugging Face LLM          챕터 · 설명
+                      ├─ Ollama gemma4:e4b        챕터 · 설명
                       ├─ FFmpeg                    구간 클립
                       └─ RAG + Wikipedia Agent     챗봇 Q&A
 ```
@@ -24,8 +24,9 @@ Spring Boot (:8181)  ──JDBC──►  Oracle DB (:1521)
 | 구성 요소                                    | 역할                             | 기본 포트  |
 | ---------------------------------------- | ------------------------------ | ------ |
 | **Spring Boot** (`CL-Project`)           | 웹 UI, 인증, 영상/집중도 API, Flask 연동 | `8181` |
-| **Python Flask** (`python-microservice`) | 영상 분석·LLM·RAG 마이크로서비스          | `5001` |
-| **Oracle Database**                      | 사용자, 영상, 챕터, 집중도 데이터           | `1521` |
+| **Python Flask** (`python-microservice`) | 영상 분석·RAG 마이크로서비스. LLM은 Ollama 호출 | `5001` |
+| **Ollama**                               | gemma4:e4b 챕터 분할·구간 설명             | `11434` |
+| **SQLite**                               | 사용자, 영상, 챕터, 집중도 데이터. 파일 `CL-Project/data/aikademia.db` | 없음 |
 
 
 ---
@@ -49,18 +50,19 @@ Spring Boot (:8181)  ──JDBC──►  Oracle DB (:1521)
 - Java 17+, Spring Boot 3.3.5
 - Spring Security, Spring Data JPA, Thymeleaf
 - WebClient / RestTemplate → Flask 연동
-- Oracle JDBC (`ojdbc11`)
+- SQLite JDBC (`sqlite-jdbc`)
 
 ### AI Microservice (Python)
 
-- Flask, faster-whisper, PyTorch (CUDA 11.8)
-- Transformers / Hugging Face LLM (기본: 로컬 HF 모델)
+- Flask, faster-whisper, PyTorch (CUDA 11.8, Whisper용)
+- Ollama `gemma4:e4b` (챕터 분할·구간 설명)
 - sentence-transformers + FAISS (RAG)
 - KoNLPy, Wikipedia API
 
 ### Infra / Tools
 
-- Oracle XE (Docker 이미지 또는 로컬 설치)
+- Ollama (`ollama pull gemma4:e4b`)
+- SQLite (`CL-Project/data/aikademia.db`)
 - FFmpeg (오디오 추출·영상 클립)
 - Conda (Python 환경 분리)
 
@@ -94,6 +96,7 @@ ai-proj/
 │       ├── .env.example
 │       └── services/
 │           ├── transcriber.py       # Whisper 전사
+│           ├── ollama_client.py     # Ollama gemma4:e4b
 │           ├── chapterizer.py       # 챕터 생성
 │           ├── explainer.py         # 구간 설명
 │           ├── rag_service.py       # FAISS RAG
@@ -109,9 +112,9 @@ ai-proj/
 1. **Git**
 2. **JDK 17+** (프로젝트 `pom.xml` 기준)
 3. **Miniconda / Anaconda**
-4. **Docker Desktop** (사전 구성 Oracle DB 이미지 사용 시)
-5. **FFmpeg** — PATH에 등록하거나 `ai-proj/AudioModel/ffmpeg.exe`에 배치
-6. **GPU + CUDA** (권장) — 로컬 LLM·Whisper 가속용
+4. **FFmpeg** — PATH에 등록하거나 `ai-proj/AudioModel/ffmpeg.exe`에 배치
+5. **Ollama** — 챕터·설명용 LLM. 모델은 `ollama pull gemma4:e4b`
+6. **GPU + CUDA** (권장) — Ollama의 gemma4:e4b와 Whisper 가속용
 
 ---
 
@@ -119,24 +122,9 @@ ai-proj/
 
 자세한 단계는 `[CL-Project/README.md](CL-Project/README.md)`를 참고하세요.
 
-### 1. Oracle DB 실행
+### 1. SQLite
 
-```bash
-docker run -d --name oracle-db -p 1521:1521 laoi/cl-project-db:v1
-```
-
-> 이미지에 테이블·시퀀스·admin 계정이 포함되어 있습니다.  
-> 로컬 Oracle을 쓰는 경우 `[CL-Project/DATABASE_SETUP.md](CL-Project/DATABASE_SETUP.md)`를 참고하세요.
-
-`application.properties` 기본 접속 정보:
-
-
-| 항목       | 값                                         |
-| -------- | ----------------------------------------- |
-| URL      | `jdbc:oracle:thin:@localhost:1521/XEPDB1` |
-| User     | `aiproj`                                  |
-| Password | `aiproj`                                  |
-
+별도 DB 서버는 없습니다. Spring Boot가 시작되면 `CL-Project/data/aikademia.db` 파일을 만들고 테이블을 생성합니다.
 
 ### 2. Python 환경
 
@@ -153,11 +141,12 @@ conda activate ocr_env
 pip install -r core/craft/requirements.txt
 ```
 
-`.env.example`을 복사해 `.env`를 만들고 Hugging Face 토큰 등을 설정합니다.
+Ollama에 모델을 받은 뒤 `.env.example`을 복사해 `.env`를 만듭니다. 기본 모델은 `gemma4:e4b`, 주소는 `http://127.0.0.1:11434`입니다. 다른 서버를 쓰면 `OLLAMA_BASE_URL`만 바꿉니다.
 
 ```bash
+ollama pull gemma4:e4b
 cp .env.example .env
-# HF_TOKEN, HF_MODEL_ID, WHISPER_MODEL 등 수정
+# OLLAMA_BASE_URL, OLLAMA_MODEL, WHISPER_MODEL 등 수정
 ```
 
 ### 3. 서비스 실행 (순서 중요)
@@ -185,7 +174,7 @@ mvnw.cmd spring-boot:run
 ### 4. 접속 확인
 
 - 웹: [http://localhost:8181](http://localhost:8181)
-- Docker DB 기본 관리자: `admin` / `admin123`
+- 회원가입 후 로그인합니다. 계정은 SQLite 파일에 저장됩니다.
 - Analyze 페이지에서 영상 업로드로 파이프라인 검증
 
 ---
@@ -242,9 +231,9 @@ Spring → Flask URL은 `application.properties`의 `app.flask.url`로 지정합
 1. 사용자가 영상 업로드
 2. Spring이 Flask `/analyze`로 전달
 3. **Whisper**가 자막 세그먼트 생성
-4. **LLM**이 세그먼트를 챕터로 묶고 (10초 미만 챕터 필터링)
+4. **Ollama gemma4:e4b**가 세그먼트를 챕터로 묶고 (10초 미만 챕터 필터링)
 5. 필요 시 `/explain`, `/chat`, `/clip`으로 설명·질의·구간 추출
-6. 결과·메타데이터를 Oracle에 저장, 브라우저에서 재생·집중도 기록
+6. 결과·메타데이터를 SQLite에 저장, 브라우저에서 재생·집중도 기록
 
 ---
 

@@ -7,7 +7,7 @@ This guide details the necessary steps to set up the complete development enviro
 The application consists of three main parts:
 1.  **Java Backend (Spring Boot):** The main web server.
 2.  **Python Analysis Service:** A Flask-based microservice for AI/ML tasks.
-3.  **Oracle Database (Docker):** A pre-configured database container.
+3.  **SQLite:** 사용자, 영상, 챕터, 집중도 데이터는 `data/aikademia.db` 파일에 저장됩니다.
 
 ---
 
@@ -18,8 +18,7 @@ Before starting, ensure the following software is installed on your system.
 1.  **Git:** For cloning the source code. ([git-scm.com](https://git-scm.com/downloads))
 2.  **Java Development Kit (JDK) 21:** ([Oracle JDK 21](https://www.oracle.com/java/technologies/downloads/#jdk21-windows) or a similar distribution)
 3.  **Miniconda (or Anaconda):** For managing Python environments. ([docs.conda.io/projects/miniconda](https://docs.conda.io/projects/miniconda/en/latest/index.html))
-4.  **Docker Desktop:** To run the database container. ([docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop))
-5.  **FFmpeg:** For audio extraction. ([ffmpeg.org/download.html](https://ffmpeg.org/download.html))
+4.  **FFmpeg:** For audio extraction. ([ffmpeg.org/download.html](https://ffmpeg.org/download.html))
     *   **IMPORTANT:** After downloading, add the `bin` directory from the FFmpeg folder to your system's **PATH environment variable**.
 
 ---
@@ -33,12 +32,8 @@ Before starting, ensure the following software is installed on your system.
     cd CL-Project
     ```
 
-2.  **Run the Pre-Configured Oracle Database:**
-    Open a terminal and run the following command. This will download the custom, pre-configured database image from Docker Hub and start it.
-    ```bash
-    docker run -d --name oracle-db -p 1521:1521 laoi/cl-project-db:v1
-    ```
-    *Note: All tables, sequences, and the admin user are already included in this image. No SQL scripting is needed.*
+2.  **Database:**
+    No separate database server is required. On startup, Spring Boot creates `data/aikademia.db` and the tables.
 
 3.  **Set Up Python Environments:**
     Open an Anaconda Prompt or your terminal and navigate to the `python-microservice` directory.

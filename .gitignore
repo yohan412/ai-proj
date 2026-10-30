@@ -1,5 +1,9 @@
 test.mp4
 CL-Project/upload/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 docs/
 query
 CL-Project/CL-Project.tar.gz

@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 public class Video {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "video_seq")
-    @SequenceGenerator(name = "video_seq", sequenceName = "VIDEO_SEQ", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "VIDEO_ID")
     private Long videoId;
     
@@ -26,7 +25,7 @@ public class Video {
     private Double duration = 0.0;
     
     @Lob
-    @Column(name = "SEGMENTS", columnDefinition = "CLOB")
+    @Column(name = "SEGMENTS", columnDefinition = "TEXT")
     private String segments;  // JSON 형식의 자막 세그먼트
     
     @Column(name = "DETECTED_LANG", length = 10)

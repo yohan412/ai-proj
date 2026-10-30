@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 public class VideoChapter {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "chapter_seq")
-    @SequenceGenerator(name = "chapter_seq", sequenceName = "CHAPTER_SEQ", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "CHAPTER_ID")
     private Long chapterId;
     

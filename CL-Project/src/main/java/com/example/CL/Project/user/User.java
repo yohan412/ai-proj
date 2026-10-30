@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 /**
  * 사용자 엔티티
- * Oracle DB의 USERS 테이블과 매핑
+ * SQLite USERS 테이블과 매핑
  */
 @Entity
 @Table(name = "USERS")
@@ -25,11 +25,9 @@ public class User {
     
     /**
      * 순번 (Primary Key, 자동 증가)
-     * Oracle Sequence 사용
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
-    @SequenceGenerator(name = "user_seq", sequenceName = "USER_SEQ", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "USER_ID")
     private Long userId;
     

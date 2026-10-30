@@ -12,8 +12,7 @@ import java.time.LocalDateTime;
 public class ChapterAttentionAvg {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "attention_avg_seq")
-    @SequenceGenerator(name = "attention_avg_seq", sequenceName = "ATTENTION_AVG_SEQ", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "AVG_ID")
     private Long avgId;
 

@@ -13,8 +13,7 @@ import java.time.LocalDateTime;
 public class UserAttentionLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "attention_log_seq")
-    @SequenceGenerator(name = "attention_log_seq", sequenceName = "ATTENTION_LOG_SEQ", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "LOG_ID")
     private Long logId;
 

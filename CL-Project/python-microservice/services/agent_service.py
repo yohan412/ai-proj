@@ -89,7 +89,6 @@ def extract_keywords_pattern(question: str, lang: str) -> List[str]:
         return [k for k in keywords if k.lower() not in stopwords]
 
 def create_simple_qa(
-    pipe,
     stored_name: str,
     segments: List[Dict],
     question: str,
@@ -99,7 +98,6 @@ def create_simple_qa(
     Simple QA Agent - Wikipedia 답변 + 영상 자막 출처
     
     Args:
-        pipe: LLM 파이프라인 (사용 안 함)
         stored_name: 영상 파일명
         segments: 자막 세그먼트 리스트
         question: 사용자 질문
