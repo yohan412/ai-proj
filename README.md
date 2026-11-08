@@ -153,6 +153,10 @@ cp .env.example .env
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL` | `gemma4:e4b` |
 | `OLLAMA_THINK` | `false` |
+| `OLLAMA_NUM_CTX` | `16384` |
+| `CHUNK_SIZE_SEGMENTS` | `300` (챕터 경계용 윈도우 크기) |
+| `CHUNK_OVERLAP_SEGMENTS` | `50` (윈도우 간 overlap) |
+| `CHUNK_MERGE_GAP_SEC` | `30` (청크별 절단점 병합 간격, 초) |
 
 ### 4. 서비스 실행 (순서 중요)
 
@@ -235,7 +239,8 @@ Spring → Flask URL은 `application.properties`의 `app.flask.url`로 지정합
 1. 사용자가 영상 업로드
 2. Spring이 Flask `/analyze`로 전달
 3. **Whisper**가 자막 세그먼트 생성
-4. **Ollama `gemma4:e4b`**가 세그먼트를 챕터로 묶음 (10초 미만 챕터 필터링)
+4. **Ollama `gemma4:e4b`**가 세그먼트를 챕터로 묶음  
+   (긴 자막은 overlap 청킹 후 경계 병합, 10초 미만 챕터 필터링)
 5. 필요 시 `/explain`, `/chat`, `/clip`으로 설명·질의·구간 추출
 6. 결과·메타데이터를 SQLite에 저장하고, 브라우저에서 재생·집중도 기록
 

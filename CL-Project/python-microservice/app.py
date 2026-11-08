@@ -128,6 +128,9 @@ def analyze():
                         lang=lang_for_chapter,
                         temperature=cfg.OLLAMA_TEMPERATURE,
                         max_segments_for_prompt=cfg.MAX_SEGMENTS_FOR_PROMPT,
+                        chunk_size=cfg.CHUNK_SIZE_SEGMENTS,
+                        chunk_overlap=cfg.CHUNK_OVERLAP_SEGMENTS,
+                        merge_gap_sec=cfg.CHUNK_MERGE_GAP_SEC,
                     )
                     app.logger.info(f"Chapterization completed. Chapters: {len(chapters)}")
                 else:
